@@ -1,8 +1,9 @@
 [workspace]
 members = [
-    "pallets/*",
     "node",
-    "runtime"
+    "pallets/*",
+    "primitives",
+    "runtime",
 ]
 
 resolver = "2"
