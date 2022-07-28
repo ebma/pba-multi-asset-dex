@@ -17,8 +17,8 @@ use sp_std::{
 pub use amount::Amount;
 pub use pallet::*;
 use primitives::TruncateFixedPointToInt;
+pub use types::CurrencyId;
 use types::*;
-pub use types::{CurrencyConversion, CurrencyId};
 
 #[cfg(test)]
 mod mock;
@@ -35,8 +35,6 @@ mod types;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use std::fmt::Debug;
-
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -82,8 +80,6 @@ pub mod pallet {
 		/// Native currency e.g. INTR/KINT
 		#[pallet::constant]
 		type GetNativeCurrencyId: Get<CurrencyId<Self>>;
-
-		type CurrencyConversion: types::CurrencyConversion<Amount<Self>, CurrencyId<Self>>;
 	}
 
 	#[pallet::pallet]

@@ -1,20 +1,18 @@
-use frame_support::{
-	dispatch::{DispatchError, DispatchResult},
-	ensure,
-};
-use sp_runtime::{
-	traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, UniqueSaturatedInto, Zero},
-	FixedPointNumber,
-};
-
-use orml_traits::{MultiCurrency, MultiReservableCurrency};
-use primitives::TruncateFixedPointToInt;
-use sp_std::{convert::TryInto, fmt::Debug};
-
 use crate::{
 	pallet::{self, Config, Error},
 	types::*,
 };
+use frame_support::{
+	dispatch::{DispatchError, DispatchResult},
+	ensure,
+};
+use orml_traits::{MultiCurrency, MultiReservableCurrency};
+use primitives::TruncateFixedPointToInt;
+use sp_runtime::{
+	traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, UniqueSaturatedInto, Zero},
+	FixedPointNumber,
+};
+use sp_std::{convert::TryInto, fmt::Debug};
 
 #[cfg_attr(feature = "testing-utils", derive(Copy))]
 #[derive(Clone, PartialEq, Eq, Debug)]
