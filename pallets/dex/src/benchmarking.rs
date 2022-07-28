@@ -1,4 +1,4 @@
-//! Benchmarking setup for pallet-template
+//! Benchmarking setup for pallet-dex
 
 use frame_benchmarking::{benchmarks, whitelisted_caller};
 use frame_system::RawOrigin;
