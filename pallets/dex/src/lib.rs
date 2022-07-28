@@ -1,9 +1,24 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/v3/runtime/frame>
+use codec::{EncodeLike, FullCodec};
+use frame_support::{dispatch::DispatchResult, traits::Get};
+use orml_traits::{MultiCurrency, MultiReservableCurrency};
+use scale_info::TypeInfo;
+use sp_runtime::{
+	traits::{AtLeast32BitUnsigned, CheckedDiv, MaybeSerializeDeserialize},
+	FixedPointNumber, FixedPointOperand,
+};
+use sp_std::{
+	convert::{TryFrom, TryInto},
+	fmt::Debug,
+	marker::PhantomData,
+};
+
+pub use amount::Amount;
 pub use pallet::*;
+use primitives::TruncateFixedPointToInt;
+use types::*;
+pub use types::{CurrencyConversion, CurrencyId};
 
 #[cfg(test)]
 mod mock;
@@ -11,19 +26,64 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod amount;
+
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+mod types;
+
 #[frame_support::pallet]
 pub mod pallet {
+	use std::fmt::Debug;
+
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
+	use super::*;
+
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config:
+		frame_system::Config + orml_tokens::Config<Balance = BalanceOf<Self>>
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+
+		type UnsignedFixedPoint: FixedPointNumber<Inner = BalanceOf<Self>>
+			+ TruncateFixedPointToInt
+			+ Encode
+			+ EncodeLike
+			+ Decode
+			+ MaybeSerializeDeserialize
+			+ TypeInfo;
+
+		type SignedInner: Debug
+			+ CheckedDiv
+			+ TryFrom<BalanceOf<Self>>
+			+ TryInto<BalanceOf<Self>>
+			+ MaybeSerializeDeserialize;
+
+		type SignedFixedPoint: FixedPointNumber<Inner = SignedInner<Self>>
+			+ TruncateFixedPointToInt
+			+ Encode
+			+ EncodeLike
+			+ Decode
+			+ MaybeSerializeDeserialize;
+
+		type Balance: AtLeast32BitUnsigned
+			+ FixedPointOperand
+			+ MaybeSerializeDeserialize
+			+ FullCodec
+			+ Copy
+			+ Default
+			+ Debug;
+
+		/// Native currency e.g. INTR/KINT
+		#[pallet::constant]
+		type GetNativeCurrencyId: Get<CurrencyId<Self>>;
+
+		type CurrencyConversion: types::CurrencyConversion<Amount<Self>, CurrencyId<Self>>;
 	}
 
 	#[pallet::pallet]
