@@ -10,9 +10,8 @@ use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, ConstU128, IdentityLookup, Zero},
+	traits::{BlakeTwo256, ConstU128, ConvertInto, IdentityLookup, Zero},
 };
-use sp_runtime::traits::ConvertInto;
 
 use crate as pallet_dex;
 
@@ -66,9 +65,6 @@ pub type AccountId = u64;
 pub type AssetId = u64;
 pub type Balance = u128;
 pub type BlockNumber = u64;
-pub type UnsignedFixedPoint = FixedU128;
-pub type SignedFixedPoint = FixedI128;
-pub type SignedInner = i128;
 pub type PoolId = u128;
 pub type Moment = u64;
 pub type Index = u64;
@@ -81,9 +77,6 @@ parameter_types! {
 
 impl pallet_dex::Config for Test {
 	type Event = Event;
-	type UnsignedFixedPoint = UnsignedFixedPoint;
-	type SignedInner = SignedInner;
-	type SignedFixedPoint = SignedFixedPoint;
 	type Balance = Balance;
 	type GetNativeCurrencyId = GetNativeCurrencyId;
 	type AssetId = AssetId;

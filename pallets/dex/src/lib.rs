@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use calc::compute_deposit_lp;
 use codec::{EncodeLike, FullCodec};
 use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
 use orml_traits::{arithmetic::CheckedAdd, MultiCurrency, MultiReservableCurrency};
@@ -15,7 +16,6 @@ use sp_std::{
 	fmt::Debug,
 	marker::PhantomData,
 };
-use calc::compute_deposit_lp;
 
 pub use pallet::*;
 use primitives::TruncateFixedPointToInt;
@@ -60,27 +60,6 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
-		type UnsignedFixedPoint: FixedPointNumber<Inner = BalanceOf<Self>>
-			+ TruncateFixedPointToInt
-			+ Encode
-			+ EncodeLike
-			+ Decode
-			+ MaybeSerializeDeserialize
-			+ TypeInfo;
-
-		type SignedInner: Debug
-			+ CheckedDiv
-			+ TryFrom<BalanceOf<Self>>
-			+ TryInto<BalanceOf<Self>>
-			+ MaybeSerializeDeserialize;
-
-		type SignedFixedPoint: FixedPointNumber<Inner = SignedInner<Self>>
-			+ TruncateFixedPointToInt
-			+ Encode
-			+ EncodeLike
-			+ Decode
-			+ MaybeSerializeDeserialize;
-
 		type Balance: AtLeast32BitUnsigned
 			+ FixedPointOperand
 			+ MaybeSerializeDeserialize
@@ -121,10 +100,13 @@ pub mod pallet {
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
-		type Assets: MultiCurrency<Self::AccountId, Balance = BalanceOf<Self>, CurrencyId = Self::AssetId>;
+		type Assets: MultiCurrency<
+			Self::AccountId,
+			Balance = BalanceOf<Self>,
+			CurrencyId = Self::AssetId,
+		>;
 
 		type Convert: Convert<u128, BalanceOf<Self>> + Convert<BalanceOf<Self>, u128>;
-
 	}
 
 	#[pallet::pallet]
