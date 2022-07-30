@@ -96,6 +96,8 @@ pub type UnsignedFixedPoint = FixedU128;
 /// The `Inner` type of the `UnsignedFixedPoint`.
 pub type UnsignedInner = u128;
 
+pub type BasicCurrencyAdapter<R, B> = orml_currencies::BasicCurrencyAdapter<R, B, Amount, Balance>;
+
 pub trait CurrencyInfo {
 	fn name(&self) -> &str;
 	fn symbol(&self) -> &str;
@@ -142,12 +144,4 @@ pub enum TokenSymbol {
 pub enum CurrencyId {
 	Token(TokenSymbol),
 	Native,
-}
-
-pub type ForeignAssetId = u32;
-
-#[derive(scale_info::TypeInfo, Encode, Decode, Clone, Eq, PartialEq, Debug)]
-pub struct CustomMetadata {
-	pub fee_per_second: u128,
-	pub coingecko_id: Vec<u8>,
 }
