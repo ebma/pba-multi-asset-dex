@@ -2,22 +2,28 @@
 
 use codec::{EncodeLike, FullCodec};
 use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
-use orml_traits::{MultiCurrency, MultiReservableCurrency};
+use orml_traits::{arithmetic::CheckedAdd, MultiCurrency, MultiReservableCurrency};
 use scale_info::TypeInfo;
 use sp_runtime::{
-	traits::{AtLeast32BitUnsigned, CheckedDiv, MaybeSerializeDeserialize},
-	FixedPointNumber, FixedPointOperand,
+	traits::{
+		AccountIdConversion, AtLeast32BitUnsigned, CheckedDiv, MaybeSerializeDeserialize, One, Zero,
+	},
+	ArithmeticError, FixedPointNumber, FixedPointOperand,
 };
 use sp_std::{
 	convert::{TryFrom, TryInto},
 	fmt::Debug,
 	marker::PhantomData,
 };
+use calc::compute_deposit_lp;
 
 pub use pallet::*;
 use primitives::TruncateFixedPointToInt;
 pub use types::CurrencyId;
 use types::*;
+mod calc;
+mod traits;
+mod types;
 
 #[cfg(test)]
 mod mock;
@@ -28,23 +34,21 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
-mod types;
-
-mod pool;
-
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{AccountIdConversion, One, Zero};
+	use sp_runtime::traits::Convert;
 
-	use crate::pool::{Amm, CurrencyPair, Pool};
+	use crate::traits::{Amm, CurrencyPair, Pool};
 
 	use super::*;
 
 	pub(crate) type AssetIdOf<T> = <T as Config>::AssetId;
 	pub(crate) type BalanceOf<T> = <T as Config>::Balance;
+	// pub(crate) type BalanceOf<T> = <T as orml_tokens::Config>::Balance;
 	pub(crate) type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+	pub(crate) type PoolOf<T> = Pool<AccountIdOf<T>, AssetIdOf<T>>;
 
 	type PoolIdOf<T> = <T as Config>::PoolId;
 
@@ -111,12 +115,16 @@ pub mod pallet {
 			+ Ord
 			+ Copy
 			+ Zero
+			+ CheckedAdd
 			+ One;
 
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
-		type Assets: MultiCurrency<Self::AccountId>;
+		type Assets: MultiCurrency<Self::AccountId, Balance = BalanceOf<Self>, CurrencyId = Self::AssetId>;
+
+		type Convert: Convert<u128, BalanceOf<Self>> + Convert<BalanceOf<Self>, u128>;
+
 	}
 
 	#[pallet::pallet]
@@ -156,6 +164,8 @@ pub mod pallet {
 	#[pallet::error]
 	pub enum Error<T> {
 		PoolNotFound,
+		MaximumPoolCountReached,
+		InvalidAmount,
 	}
 
 	#[pallet::call]
@@ -170,13 +180,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let _ = ensure_signed(origin)?;
 
-			let pool_id =
-				PoolCount::<T>::try_mutate(|pool_count| -> Result<T::PoolId, DispatchError> {
-					let pool_id = *pool_count;
-					Pools::<T>::insert(pool_id, pool.clone());
-					*pool_count = pool_id + T::PoolId::one();
-					Ok(pool_id)
-				})?;
+			let pool_id = Self::_create_pool(pool.clone())?;
 
 			Self::deposit_event(Event::<T>::PoolCreated {
 				owner: pool.owner,
@@ -211,6 +215,19 @@ pub mod pallet {
 
 		pub(crate) fn account_id(pool_id: &T::PoolId) -> T::AccountId {
 			T::PalletId::get().into_sub_account_truncating(pool_id)
+		}
+
+		fn _create_pool(pool: PoolOf<T>) -> Result<PoolIdOf<T>, DispatchError> {
+			let pool_id =
+				PoolCount::<T>::try_mutate(|pool_count| -> Result<T::PoolId, DispatchError> {
+					let pool_id = *pool_count;
+					Pools::<T>::insert(pool_id, pool.clone());
+					*pool_count = pool_id
+						.checked_add(&T::PoolId::one())
+						.ok_or(Error::<T>::MaximumPoolCountReached)?;
+					Ok(pool_id)
+				})?;
+			Ok(pool_id)
 		}
 	}
 
@@ -276,6 +293,29 @@ pub mod pallet {
 		) -> Result<(), DispatchError> {
 			let pool = Self::get_pool(pool_id)?;
 			let pool_account = Self::account_id(&pool_id);
+
+			let pool_base_aum =
+				T::Convert::convert(T::Assets::free_balance(pool.pair.first, &pool_account));
+			let pool_quote_aum =
+				T::Convert::convert(T::Assets::free_balance(pool.pair.second, &pool_account));
+
+			let lp_total_issuance = T::Convert::convert(T::Assets::total_issuance(pool.lp_token));
+			let (second_amount, amount_of_lp_token_to_mint) = compute_deposit_lp(
+				lp_total_issuance,
+				T::Convert::convert(first_amount),
+				T::Convert::convert(second_amount),
+				pool_base_aum,
+				pool_quote_aum,
+			)?;
+			let second_amount = T::Convert::convert(second_amount);
+			let amount_of_lp_token_to_mint = T::Convert::convert(amount_of_lp_token_to_mint);
+
+			ensure!(second_amount > Self::Balance::zero(), Error::<T>::InvalidAmount);
+
+			T::Assets::transfer(pool.pair.first, who, &pool_account, first_amount)?;
+			T::Assets::transfer(pool.pair.second, who, &pool_account, second_amount)?;
+			// T::Assets::mint_into(pool.lp_token, who, amount_of_lp_token_to_mint)?;
+
 			// TODO
 			let first_amount: BalanceOf<T> = Self::Balance::zero();
 			let second_amount: BalanceOf<T> = Self::Balance::zero();

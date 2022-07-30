@@ -1,20 +1,31 @@
 use frame_support::{assert_noop, assert_ok};
+use frame_system::{Config, EventRecord};
+use sp_core::H256;
 use sp_runtime::Permill;
 
 use primitives::TokenSymbol;
 
 use crate::{
+	mock,
 	mock::*,
-	pool::{CurrencyPair, Pool},
+	traits::{CurrencyPair, Pool},
 	Error,
 };
 
-#[test]
-fn correct_error_for_none_value() {
-	new_test_ext().execute_with(|| {
-		// Ensure the expected error is thrown when no value is present.
-		// assert_noop!(DexModule::cause_error(Origin::signed(1)), Error::<Test>::NoneValue);
-	});
+pub fn assert_has_event<T, F>(matcher: F)
+where
+	T: Config,
+	F: Fn(&EventRecord<mock::Event, H256>) -> bool,
+{
+	assert!(System::events().iter().any(matcher));
+}
+
+pub fn assert_last_event<T, F>(matcher: F)
+where
+	T: Config,
+	F: FnOnce(&EventRecord<mock::Event, H256>) -> bool,
+{
+	assert!(matcher(System::events().last().expect("events expected")));
 }
 
 fn create_default_pool() -> Pool<AccountId, AssetId> {
@@ -34,11 +45,17 @@ fn create_default_pool() -> Pool<AccountId, AssetId> {
 fn create_pool_should_work() {
 	run_test(|| {
 		let pool = create_default_pool();
-		DexModule::create_pool(Origin::signed(ALICE), pool);
+		Dex::create_pool(Origin::signed(ALICE), pool);
 
-		assert_eq!(DexModule::pools(0), Some(pool));
+		assert_eq!(Dex::pools(0), Some(pool));
 
-		assert_eq!(DexModule::pool_count(), 1)
+		assert_eq!(Dex::pool_count(), 1);
+
+		assert_last_event::<Test, _>(|e| {
+			matches!(e.event,
+            mock::Event::Dex(crate::Event::PoolCreated { owner, pool_id, assets })
+            if owner == ALICE && pool_id == 0 && assets == pool.pair)
+		});
 	});
 }
 
@@ -46,11 +63,11 @@ fn create_pool_should_work() {
 fn remove_pool_should_work() {
 	run_test(|| {
 		let pool = create_default_pool();
-		DexModule::create_pool(Origin::signed(ALICE), pool);
+		Dex::create_pool(Origin::signed(ALICE), pool);
 
-		assert_eq!(DexModule::pools(0), Some(pool));
+		assert_eq!(Dex::pools(0), Some(pool));
 
-		assert_eq!(DexModule::pool_count(), 1)
+		assert_eq!(Dex::pool_count(), 1)
 	});
 }
 
@@ -59,8 +76,8 @@ fn add_liquidity_should_work() {
 	run_test(|| {
 		let pool = create_default_pool();
 
-		DexModule::create_pool(Origin::signed(ALICE), pool);
-		DexModule::add_liquidity(Origin::signed(ALICE), 0, 100, 100);
-		println!("{:?}", DexModule::pools(0));
+		Dex::create_pool(Origin::signed(ALICE), pool);
+		Dex::add_liquidity(Origin::signed(ALICE), 0, 100, 100);
+		println!("{:?}", Dex::pools(0));
 	});
 }

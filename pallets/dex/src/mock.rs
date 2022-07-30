@@ -12,6 +12,7 @@ use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, ConstU128, IdentityLookup, Zero},
 };
+use sp_runtime::traits::ConvertInto;
 
 use crate as pallet_dex;
 
@@ -30,7 +31,7 @@ frame_support::construct_runtime!(
 		Tokens: orml_tokens::{Pallet, Storage, Config<T>, Event<T>},
 		Currencies: orml_currencies::{Pallet, Storage},
 
-		DexModule: pallet_dex::{Pallet, Call, Storage, Event<T>},
+		Dex: pallet_dex::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -80,15 +81,16 @@ parameter_types! {
 
 impl pallet_dex::Config for Test {
 	type Event = Event;
+	type UnsignedFixedPoint = UnsignedFixedPoint;
 	type SignedInner = SignedInner;
 	type SignedFixedPoint = SignedFixedPoint;
-	type UnsignedFixedPoint = UnsignedFixedPoint;
 	type Balance = Balance;
 	type GetNativeCurrencyId = GetNativeCurrencyId;
-	type Assets = Tokens;
 	type AssetId = AssetId;
 	type PoolId = PoolId;
 	type PalletId = DexPalletId;
+	type Assets = Tokens;
+	type Convert = ConvertInto;
 }
 
 impl pallet_balances::Config for Test {
@@ -119,12 +121,12 @@ impl orml_tokens::Config for Test {
 	type WeightInfo = ();
 	type ExistentialDeposits = ExistentialDeposits;
 	type OnDust = ();
-	type MaxLocks = MaxLocks;
-	type DustRemovalWhitelist = Everything;
-	type MaxReserves = ConstU32<0>;
-	type ReserveIdentifier = [u8; 8];
 	type OnNewTokenAccount = ();
 	type OnKilledTokenAccount = ();
+	type MaxLocks = MaxLocks;
+	type MaxReserves = ConstU32<0>;
+	type ReserveIdentifier = [u8; 8];
+	type DustRemovalWhitelist = Everything;
 }
 
 impl orml_currencies::Config for Test {
