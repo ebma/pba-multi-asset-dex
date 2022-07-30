@@ -145,3 +145,9 @@ pub enum CurrencyId {
 	Token(TokenSymbol),
 	Native,
 }
+
+impl std::default::Default for CurrencyId {
+	fn default() -> Self {
+		CurrencyId::Native
+	}
+}

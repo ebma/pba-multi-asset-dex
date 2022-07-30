@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{EncodeLike, FullCodec};
-use frame_support::{dispatch::DispatchResult, traits::Get};
+use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
 use orml_traits::{MultiCurrency, MultiReservableCurrency};
 use scale_info::TypeInfo;
 use sp_runtime::{
@@ -14,7 +14,6 @@ use sp_std::{
 	marker::PhantomData,
 };
 
-pub use amount::Amount;
 pub use pallet::*;
 use primitives::TruncateFixedPointToInt;
 pub use types::CurrencyId;
@@ -26,19 +25,28 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-pub mod amount;
-
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
 mod types;
 
+mod pool;
+
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
+	use sp_runtime::traits::{AccountIdConversion, One, Zero};
+
+	use crate::pool::{Amm, CurrencyPair, Pool};
 
 	use super::*;
+
+	pub(crate) type AssetIdOf<T> = <T as Config>::AssetId;
+	pub(crate) type BalanceOf<T> = <T as Config>::Balance;
+	pub(crate) type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+
+	type PoolIdOf<T> = <T as Config>::PoolId;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -75,85 +83,232 @@ pub mod pallet {
 			+ FullCodec
 			+ Copy
 			+ Default
+			+ TypeInfo
 			+ Debug;
 
 		#[pallet::constant]
 		type GetNativeCurrencyId: Get<CurrencyId<Self>>;
 
-		type Currencies: MultiCurrency<Self::AccountId>;
+		type AssetId: FullCodec
+			+ MaxEncodedLen
+			+ Eq
+			+ PartialEq
+			+ Copy
+			+ Clone
+			+ MaybeSerializeDeserialize
+			+ Debug
+			+ Default
+			+ TypeInfo
+			+ Ord;
+
+		type PoolId: FullCodec
+			+ MaxEncodedLen
+			+ Default
+			+ Debug
+			+ TypeInfo
+			+ Eq
+			+ PartialEq
+			+ Ord
+			+ Copy
+			+ Zero
+			+ One;
+
+		#[pallet::constant]
+		type PalletId: Get<PalletId>;
+
+		type Assets: MultiCurrency<Self::AccountId>;
 	}
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub (super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/v3/runtime/storage
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn pool_count)]
+	#[allow(clippy::disallowed_types)]
+	pub type PoolCount<T: Config> = StorageValue<_, T::PoolId, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn pools)]
+	pub type Pools<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::PoolId, Pool<T::AccountId, T::AssetId>>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
 	#[pallet::event]
 	#[pallet::generate_deposit(pub (super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+		PoolCreated {
+			pool_id: T::PoolId,
+			owner: T::AccountId,
+			assets: CurrencyPair<AssetIdOf<T>>,
+		},
+		LiquidityAdded {
+			who: T::AccountId,
+			pool_id: T::PoolId,
+			first_amount: BalanceOf<T>,
+			second_amount: BalanceOf<T>,
+			minted_lp: BalanceOf<T>,
+		},
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		PoolNotFound,
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/v3/runtime/origins
-			let who = ensure_signed(origin)?;
+		/// Create pool
+		///
+		/// Emits `PoolCreated` event when successful.
+		#[pallet::weight(10_000)]
+		pub fn create_pool(
+			origin: OriginFor<T>,
+			pool: Pool<T::AccountId, T::AssetId>,
+		) -> DispatchResult {
+			let _ = ensure_signed(origin)?;
 
-			// Update storage.
-			<Something<T>>::put(something);
+			let pool_id =
+				PoolCount::<T>::try_mutate(|pool_count| -> Result<T::PoolId, DispatchError> {
+					let pool_id = *pool_count;
+					Pools::<T>::insert(pool_id, pool.clone());
+					*pool_count = pool_id + T::PoolId::one();
+					Ok(pool_id)
+				})?;
 
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
+			Self::deposit_event(Event::<T>::PoolCreated {
+				owner: pool.owner,
+				pool_id,
+				assets: pool.pair,
+			});
+
 			Ok(())
 		}
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1, 1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+		#[pallet::weight(10_000)]
+		pub fn add_liquidity(
+			origin: OriginFor<T>,
+			pool_id: T::PoolId,
+			first_amount: BalanceOf<T>,
+			second_amount: BalanceOf<T>,
+		) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
 
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
+			<Self as Amm>::add_liquidity(&sender, pool_id, first_amount, second_amount)?;
+
+			Ok(())
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		pub(crate) fn get_pool(
+			pool_id: T::PoolId,
+		) -> Result<Pool<T::AccountId, T::AssetId>, DispatchError> {
+			Pools::<T>::get(pool_id).ok_or_else(|| Error::<T>::PoolNotFound.into())
+		}
+
+		pub(crate) fn account_id(pool_id: &T::PoolId) -> T::AccountId {
+			T::PalletId::get().into_sub_account_truncating(pool_id)
+		}
+	}
+
+	impl<T: Config> Amm for Pallet<T> {
+		type AssetId = T::AssetId;
+		type Balance = BalanceOf<T>;
+		type AccountId = T::AccountId;
+		type PoolId = T::PoolId;
+
+		fn pool_exists(pool_id: Self::PoolId) -> bool {
+			Pools::<T>::contains_key(pool_id)
+		}
+
+		fn currency_pair(
+			pool_id: Self::PoolId,
+		) -> Result<CurrencyPair<Self::AssetId>, DispatchError> {
+			let pool = Self::get_pool(pool_id)?;
+			Ok(pool.pair)
+		}
+
+		fn lp_token(pool_id: Self::PoolId) -> Result<Self::AssetId, DispatchError> {
+			let pool = Self::get_pool(pool_id)?;
+			Ok(pool.lp_token)
+		}
+
+		fn get_exchange_value(
+			pool_id: Self::PoolId,
+			asset_id: Self::AssetId,
+			amount: Self::Balance,
+		) -> Result<Self::Balance, DispatchError> {
+			todo!();
+			Ok(Self::Balance::zero())
+		}
+
+		#[transactional]
+		fn buy(
+			who: &Self::AccountId,
+			pool_id: Self::PoolId,
+			asset_id: Self::AssetId,
+			amount: Self::Balance,
+		) -> Result<Self::Balance, DispatchError> {
+			todo!();
+			Ok(Self::Balance::zero())
+		}
+
+		#[transactional]
+		fn sell(
+			who: &Self::AccountId,
+			pool_id: Self::PoolId,
+			asset_id: Self::AssetId,
+			amount: Self::Balance,
+		) -> Result<Self::Balance, DispatchError> {
+			todo!();
+			Ok(Self::Balance::zero())
+		}
+
+		#[transactional]
+		fn add_liquidity(
+			who: &Self::AccountId,
+			pool_id: Self::PoolId,
+			first_amount: Self::Balance,
+			second_amount: Self::Balance,
+		) -> Result<(), DispatchError> {
+			let pool = Self::get_pool(pool_id)?;
+			let pool_account = Self::account_id(&pool_id);
+			// TODO
+			let first_amount: BalanceOf<T> = Self::Balance::zero();
+			let second_amount: BalanceOf<T> = Self::Balance::zero();
+			let minted_lp: BalanceOf<T> = Self::Balance::zero();
+			Self::deposit_event(Event::<T>::LiquidityAdded {
+				who: who.clone(),
+				pool_id,
+				first_amount,
+				second_amount,
+				minted_lp,
+			});
+			Ok(())
+		}
+
+		#[transactional]
+		fn remove_liquidity(
+			who: &Self::AccountId,
+			pool_id: Self::PoolId,
+			lp_amount: Self::Balance,
+		) -> Result<(), DispatchError> {
+			todo!();
+			Ok(())
+		}
+
+		#[transactional]
+		fn swap(
+			who: &Self::AccountId,
+			pool_id: Self::PoolId,
+			pair: CurrencyPair<Self::AssetId>,
+			quote_amount: Self::Balance,
+		) -> Result<Self::Balance, DispatchError> {
+			todo!();
+			Ok(Self::Balance::zero())
 		}
 	}
 }

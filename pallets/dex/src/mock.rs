@@ -1,18 +1,20 @@
-use crate as pallet_dex;
 use frame_support::{
 	parameter_types,
 	traits::{ConstU16, ConstU32, ConstU64, Everything},
+	PalletId,
 };
 use frame_system as system;
 use orml_traits::parameter_type_with_key;
-pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
-use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, IdentityLookup},
+	traits::{BlakeTwo256, ConstU128, IdentityLookup},
 };
-use sp_runtime::traits::ConstU128;
+
+pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
+use sp_arithmetic::{FixedI128, FixedU128};
+
+use crate as pallet_dex;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -61,18 +63,28 @@ impl system::Config for Test {
 }
 
 pub type AccountId = u64;
+
+#[allow(dead_code)]
+pub static ALICE: AccountId = 1;
+#[allow(dead_code)]
+pub static BOB: AccountId = 2;
+#[allow(dead_code)]
+pub static CHARLIE: AccountId = 3;
+
 pub type Balance = u128;
 pub type BlockNumber = u64;
 pub type UnsignedFixedPoint = FixedU128;
 pub type SignedFixedPoint = FixedI128;
 pub type SignedInner = i128;
 pub type CurrencyId = primitives::CurrencyId;
+pub type PoolId = u128;
 pub type Moment = u64;
 pub type Index = u64;
 
 parameter_types! {
 	pub const GetNativeCurrencyId: CurrencyId = CurrencyId::Native;
 	pub const MaxLocks: u32 = 50;
+	pub const DexPalletId: PalletId = PalletId(*b"dex_pall");
 }
 
 impl pallet_dex::Config for Test {
@@ -82,7 +94,10 @@ impl pallet_dex::Config for Test {
 	type UnsignedFixedPoint = UnsignedFixedPoint;
 	type Balance = Balance;
 	type GetNativeCurrencyId = GetNativeCurrencyId;
-	type Currencies = Currencies;
+	type Assets = Tokens;
+	type AssetId = CurrencyId;
+	type PoolId = PoolId;
+	type PalletId = DexPalletId;
 }
 
 impl pallet_balances::Config for Test {
@@ -98,7 +113,6 @@ impl pallet_balances::Config for Test {
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
 }
-
 
 parameter_type_with_key! {
 	pub ExistentialDeposits: |_currency_id: CurrencyId| -> Balance {
@@ -154,4 +168,3 @@ where
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
 }
-
