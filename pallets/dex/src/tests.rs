@@ -19,3 +19,13 @@ fn correct_error_for_none_value() {
 		assert_noop!(DexModule::cause_error(Origin::signed(1)), Error::<Test>::NoneValue);
 	});
 }
+
+#[test]
+fn my_test() {
+	run_test(|| {
+		// Dispatch a signed extrinsic.
+		assert_ok!(DexModule::do_something(Origin::signed(1), 42));
+		// Read pallet storage and assert an expected result.
+		assert_eq!(DexModule::something(), Some(42));
+	});
+}

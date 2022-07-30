@@ -77,9 +77,10 @@ pub mod pallet {
 			+ Default
 			+ Debug;
 
-		/// Native currency e.g. INTR/KINT
 		#[pallet::constant]
 		type GetNativeCurrencyId: Get<CurrencyId<Self>>;
+
+		type Currencies: MultiCurrency<Self::AccountId>;
 	}
 
 	#[pallet::pallet]

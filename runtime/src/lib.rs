@@ -304,7 +304,7 @@ impl pallet_uniques::Config for Runtime {
 	type Event = Event;
 	type CollectionId = u32;
 	type ItemId = u32;
-	type Currency = Balances;
+	type Currency = Balances; // Todo change me to Currencies
 	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
 	type Locker = (); // TODO change me
@@ -326,6 +326,7 @@ impl pallet_dex::Config for Runtime {
 	type SignedFixedPoint = SignedFixedPoint;
 	type UnsignedFixedPoint = UnsignedFixedPoint;
 	type Balance = Balance;
+	type Currencies = Currencies;
 	type GetNativeCurrencyId = GetNativeCurrencyId;
 }
 
