@@ -1,18 +1,17 @@
 use frame_support::{
 	parameter_types,
-	traits::{ConstU16, ConstU32, ConstU64, Everything},
+	traits::{ConstU16, ConstU32, ConstU64, Everything, GenesisBuild},
 	PalletId,
 };
 use frame_system as system;
 use orml_traits::parameter_type_with_key;
+pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
+use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, ConstU128, IdentityLookup},
+	traits::{BlakeTwo256, ConstU128, IdentityLookup, Zero},
 };
-
-pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
-use sp_arithmetic::{FixedI128, FixedU128};
 
 use crate as pallet_dex;
 
@@ -63,26 +62,18 @@ impl system::Config for Test {
 }
 
 pub type AccountId = u64;
-
-#[allow(dead_code)]
-pub static ALICE: AccountId = 1;
-#[allow(dead_code)]
-pub static BOB: AccountId = 2;
-#[allow(dead_code)]
-pub static CHARLIE: AccountId = 3;
-
+pub type AssetId = u64;
 pub type Balance = u128;
 pub type BlockNumber = u64;
 pub type UnsignedFixedPoint = FixedU128;
 pub type SignedFixedPoint = FixedI128;
 pub type SignedInner = i128;
-pub type CurrencyId = primitives::CurrencyId;
 pub type PoolId = u128;
 pub type Moment = u64;
 pub type Index = u64;
 
 parameter_types! {
-	pub const GetNativeCurrencyId: CurrencyId = CurrencyId::Native;
+	pub const GetNativeCurrencyId: AssetId = 1;
 	pub const MaxLocks: u32 = 50;
 	pub const DexPalletId: PalletId = PalletId(*b"dex_pall");
 }
@@ -95,7 +86,7 @@ impl pallet_dex::Config for Test {
 	type Balance = Balance;
 	type GetNativeCurrencyId = GetNativeCurrencyId;
 	type Assets = Tokens;
-	type AssetId = CurrencyId;
+	type AssetId = AssetId;
 	type PoolId = PoolId;
 	type PalletId = DexPalletId;
 }
@@ -115,8 +106,8 @@ impl pallet_balances::Config for Test {
 }
 
 parameter_type_with_key! {
-	pub ExistentialDeposits: |_currency_id: CurrencyId| -> Balance {
-		0
+	pub ExistentialDeposits: |_a: AssetId| -> Balance {
+		Zero::zero()
 	};
 }
 
@@ -124,7 +115,7 @@ impl orml_tokens::Config for Test {
 	type Event = Event;
 	type Balance = Balance;
 	type Amount = primitives::Amount;
-	type CurrencyId = CurrencyId;
+	type CurrencyId = AssetId;
 	type WeightInfo = ();
 	type ExistentialDeposits = ExistentialDeposits;
 	type OnDust = ();
@@ -143,28 +134,45 @@ impl orml_currencies::Config for Test {
 	type WeightInfo = ();
 }
 
-pub type TestEvent = Event;
+pub const ALICE: AccountId = 1;
+pub const BOB: AccountId = 2;
+pub const CHARLIE: AccountId = 3;
+pub const DARWIN: AccountId = 4;
 
-pub struct ExtBuilder;
+pub const ASSET_1: AssetId = 1;
+pub const ASSET_2: AssetId = 2;
+pub const ASSET_3: AssetId = 2;
 
-impl ExtBuilder {
-	pub fn build() -> sp_io::TestExternalities {
-		let storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+pub const BALANCES: [(AccountId, Balance); 4] =
+	[(ALICE, 1000), (BOB, 1000), (CHARLIE, 1000), (DARWIN, 1000)];
 
-		sp_io::TestExternalities::from(storage)
-	}
+pub fn new_test_ext() -> sp_io::TestExternalities {
+	let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	let genesis = pallet_balances::GenesisConfig::<Test> { balances: Vec::from(BALANCES) };
+	genesis.assimilate_storage(&mut t).unwrap();
+	t.into()
+}
+
+pub fn new_test_ext_multi_currency() -> sp_io::TestExternalities {
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
+
+	let balances: Vec<(AccountId, AssetId, Balance)> =
+		vec![(ALICE, ASSET_1, 1000), (BOB, ASSET_2, 1000)];
+
+	orml_tokens::GenesisConfig::<Test> { balances }
+		.assimilate_storage(&mut t)
+		.unwrap();
+
+	let mut ext = sp_io::TestExternalities::new(t);
+	ext.execute_with(|| System::set_block_number(1));
+	ext
 }
 
 pub fn run_test<T>(test: T)
 where
 	T: FnOnce(),
 {
-	ExtBuilder::build().execute_with(|| {
+	new_test_ext_multi_currency().execute_with(|| {
 		test();
 	});
-}
-
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
 }

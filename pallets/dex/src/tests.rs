@@ -17,20 +17,24 @@ fn correct_error_for_none_value() {
 	});
 }
 
+fn create_default_pool() -> Pool<AccountId, AssetId> {
+	let owner: AccountId = ALICE;
+	let first = ASSET_1;
+	let second = ASSET_2;
+	let pair = CurrencyPair { first, second };
+
+	let lp_token = ASSET_3;
+
+	let fee: Permill = Permill::from_percent(3);
+
+	Pool { owner, pair, lp_token, fee }
+}
+
 #[test]
 fn create_pool_should_work() {
 	run_test(|| {
-		let owner: AccountId = ALICE;
-		let first = CurrencyId::Token(TokenSymbol::USDC);
-		let second = CurrencyId::Token(TokenSymbol::EURT);
-		let pair = CurrencyPair { first, second };
-
-		let lp_token = CurrencyId::Token(TokenSymbol::WBTC);
-
-		let fee: Permill = Permill::from_percent(3);
-
-		let pool = Pool { owner, pair, lp_token, fee };
-		DexModule::create_pool(Origin::signed(1), pool);
+		let pool = create_default_pool();
+		DexModule::create_pool(Origin::signed(ALICE), pool);
 
 		assert_eq!(DexModule::pools(0), Some(pool));
 
@@ -41,20 +45,22 @@ fn create_pool_should_work() {
 #[test]
 fn remove_pool_should_work() {
 	run_test(|| {
-		let owner: AccountId = ALICE;
-		let first = CurrencyId::Token(TokenSymbol::USDC);
-		let second = CurrencyId::Token(TokenSymbol::EURT);
-		let pair = CurrencyPair { first, second };
-
-		let lp_token = CurrencyId::Token(TokenSymbol::WBTC);
-
-		let fee: Permill = Permill::from_percent(3);
-
-		let pool = Pool { owner, pair, lp_token, fee };
-		DexModule::create_pool(Origin::signed(1), pool);
+		let pool = create_default_pool();
+		DexModule::create_pool(Origin::signed(ALICE), pool);
 
 		assert_eq!(DexModule::pools(0), Some(pool));
 
 		assert_eq!(DexModule::pool_count(), 1)
+	});
+}
+
+#[test]
+fn add_liquidity_should_work() {
+	run_test(|| {
+		let pool = create_default_pool();
+
+		DexModule::create_pool(Origin::signed(ALICE), pool);
+		DexModule::add_liquidity(Origin::signed(ALICE), 0, 100, 100);
+		println!("{:?}", DexModule::pools(0));
 	});
 }
