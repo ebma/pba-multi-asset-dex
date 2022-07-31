@@ -38,9 +38,10 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
+	use crate::mock::Balance;
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{CheckedMul, Convert, Saturating};
+	use sp_runtime::traits::{CheckedAdd, CheckedMul, CheckedSub, Convert, Saturating};
 
 	use crate::traits::{Amm, CurrencyPair, Pool};
 
@@ -140,6 +141,13 @@ pub mod pallet {
 			amount_b: BalanceOf<T>,
 			minted_lp: BalanceOf<T>,
 		},
+		LiquidityRemoved {
+			who: T::AccountId,
+			pool_id: PoolIdOf<T>,
+			amount_a: BalanceOf<T>,
+			amount_b: BalanceOf<T>,
+			total_issuance: BalanceOf<T>,
+		},
 	}
 
 	// Errors inform users that something went wrong.
@@ -150,7 +158,9 @@ pub mod pallet {
 		InvalidAmount,
 		InvalidAsset,
 		InsufficientBalance,
+		InsufficientLiquidityBalance,
 		InvalidExchangeValue,
+		WithdrawWithoutSupply,
 	}
 
 	#[pallet::call]
@@ -186,6 +196,19 @@ pub mod pallet {
 			let sender = ensure_signed(origin)?;
 
 			<Self as Amm>::add_liquidity(&sender, pool_id, amount, asset)?;
+
+			Ok(())
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn remove_liquidity(
+			origin: OriginFor<T>,
+			pool_id: T::PoolId,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			<Self as Amm>::remove_liquidity(&sender, pool_id, amount)?;
 
 			Ok(())
 		}
@@ -374,9 +397,51 @@ pub mod pallet {
 		fn remove_liquidity(
 			who: &Self::AccountId,
 			pool_id: Self::PoolId,
-			lp_amount: Self::Balance,
+			amount: Self::Balance,
 		) -> Result<(), DispatchError> {
-			todo!();
+			let pool = Self::get_pool(pool_id)?;
+			let pool_account = Self::account_id(&pool_id);
+			let total_issuance = T::Assets::total_issuance(pool.lp_token);
+			ensure!(!total_issuance.is_zero(), Error::<T>::WithdrawWithoutSupply);
+
+			let user_lp_balance = T::Assets::free_balance(pool.lp_token, who);
+			ensure!(user_lp_balance >= amount, Error::<T>::InsufficientLiquidityBalance);
+
+			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
+			// Convert to u128 for calculations
+			let amount = T::Convert::convert(amount);
+			let total_issuance = T::Convert::convert(total_issuance);
+			let (reserve_a, reserve_b) =
+				(T::Convert::convert(reserve_a), T::Convert::convert(reserve_b));
+
+			/// Calculate the amounts of tokens the user will receive for removing liquidity
+			let amount_a = amount.checked_mul(reserve_a).and_then(|x| x.checked_div(total_issuance));
+			let amount_b =
+				amount.checked_mul(reserve_b).and_then(|x| x.checked_div(total_issuance));
+
+			ensure!(amount_a.is_some() && amount_b.is_some(), Error::<T>::InvalidAmount);
+
+			// Unwrap and convert to Balance
+			let (amount_a, amount_b) =
+				(T::Convert::convert(amount_a.unwrap()), T::Convert::convert(amount_b.unwrap()));
+			let amount = T::Convert::convert(amount);
+
+			ensure!(!amount_a.is_zero() && !amount_b.is_zero(), Error::<T>::InvalidAmount);
+
+			T::Assets::transfer(pool.pair.token_a, &pool_account, who, amount_a)?;
+			T::Assets::transfer(pool.pair.token_b, &pool_account, who, amount_b)?;
+			T::Assets::withdraw(pool.lp_token, who, amount)?;
+
+			let total_issuance = T::Assets::total_issuance(pool.lp_token);
+
+			Self::deposit_event(Event::<T>::LiquidityRemoved {
+				who: who.clone(),
+				pool_id,
+				amount_a,
+				amount_b,
+				total_issuance,
+			});
+
 			Ok(())
 		}
 
