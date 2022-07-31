@@ -38,12 +38,15 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use crate::mock::Balance;
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
+	use sp_arithmetic::{PerThing, Permill, UpperOf};
 	use sp_runtime::traits::{CheckedAdd, CheckedMul, CheckedSub, Convert, Saturating};
 
-	use crate::traits::{Amm, CurrencyPair, Pool};
+	use crate::{
+		mock::Balance,
+		traits::{Amm, CurrencyPair, Pool},
+	};
 
 	use super::*;
 
@@ -121,8 +124,7 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn pools)]
-	pub type Pools<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::PoolId, Pool<T::AccountId, T::AssetId>>;
+	pub type Pools<T: Config> = StorageMap<_, Blake2_128Concat, T::PoolId, PoolOf<T>>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
@@ -148,11 +150,22 @@ pub mod pallet {
 			amount_b: BalanceOf<T>,
 			total_issuance: BalanceOf<T>,
 		},
+		Swapped {
+			who: T::AccountId,
+			pool_id: PoolIdOf<T>,
+			token_a: AssetIdOf<T>,
+			token_b: AssetIdOf<T>,
+			amount_a: BalanceOf<T>,
+			amount_b: BalanceOf<T>,
+			/// Charged fees.
+			fee: Permill,
+		},
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
+		PairMismatch,
 		PoolNotFound,
 		MaximumPoolCountReached,
 		InvalidAmount,
@@ -169,10 +182,7 @@ pub mod pallet {
 		///
 		/// Emits `PoolCreated` event when successful.
 		#[pallet::weight(10_000)]
-		pub fn create_pool(
-			origin: OriginFor<T>,
-			pool: Pool<T::AccountId, T::AssetId>,
-		) -> DispatchResult {
+		pub fn create_pool(origin: OriginFor<T>, pool: PoolOf<T>) -> DispatchResult {
 			let _ = ensure_signed(origin)?;
 
 			let pool_id = Self::_create_pool(pool.clone())?;
@@ -212,12 +222,25 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		/// Execute a swap
+		/// The user will send amount_b of token_b to receive the corresponding amount_a of token_a.
+		#[pallet::weight(10_000)]
+		pub fn swap(
+			origin: OriginFor<T>,
+			pool_id: PoolIdOf<T>,
+			pair: CurrencyPair<AssetIdOf<T>>,
+			amount_b: BalanceOf<T>,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			<Self as Amm>::swap(&who, pool_id, pair, amount_b)?;
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
-		pub(crate) fn get_pool(
-			pool_id: T::PoolId,
-		) -> Result<Pool<T::AccountId, T::AssetId>, DispatchError> {
+		pub(crate) fn get_pool(pool_id: T::PoolId) -> Result<PoolOf<T>, DispatchError> {
 			Pools::<T>::get(pool_id).ok_or_else(|| Error::<T>::PoolNotFound.into())
 		}
 
@@ -261,6 +284,19 @@ pub mod pallet {
 			Ok(pool.lp_token)
 		}
 
+		// Return the balances of the assets in the pool.
+		fn pool_reserves(
+			pool_id: Self::PoolId,
+		) -> Result<(Self::Balance, Self::Balance), DispatchError> {
+			let pool = Self::get_pool(pool_id)?;
+			let pool_account = Self::account_id(&pool_id);
+
+			let pair = pool.pair;
+			let reserve_a = T::Assets::free_balance(pair.token_a, &pool_account);
+			let reserve_b = T::Assets::free_balance(pair.token_b, &pool_account);
+			Ok((reserve_a, reserve_b))
+		}
+
 		// Calculate the value of a given asset in a given pool based on the other asset in the
 		// currency pair.
 		fn get_exchange_value(
@@ -287,19 +323,6 @@ pub mod pallet {
 			}
 		}
 
-		// Return the balances of the assets in the pool.
-		fn pool_reserves(
-			pool_id: Self::PoolId,
-		) -> Result<(Self::Balance, Self::Balance), DispatchError> {
-			let pool = Self::get_pool(pool_id)?;
-			let pool_account = Self::account_id(&pool_id);
-
-			let pair = pool.pair;
-			let reserve_a = T::Assets::free_balance(pair.token_a, &pool_account);
-			let reserve_b = T::Assets::free_balance(pair.token_b, &pool_account);
-			Ok((reserve_a, reserve_b))
-		}
-
 		#[transactional]
 		fn buy(
 			who: &Self::AccountId,
@@ -318,8 +341,9 @@ pub mod pallet {
 			asset_id: Self::AssetId,
 			amount: Self::Balance,
 		) -> Result<Self::Balance, DispatchError> {
-			todo!();
-			Ok(Self::Balance::zero())
+			let pool = Self::get_pool(pool_id)?;
+			let pair = if asset_id == pool.pair.token_a { pool.pair.swap() } else { pool.pair };
+			<Self as Amm>::swap(who, pool_id, pair, amount)
 		}
 
 		#[transactional]
@@ -445,15 +469,61 @@ pub mod pallet {
 			Ok(())
 		}
 
+		// Execute a swap and return the amount of tokens received by executing the swap
+		// The order of assets in the CurrencyPair will decide how the swap is executed
+		// `amount_b` specifies how much of `token_b` (the second asset in the pair) the user wants
+		// to trade to get some amount of `token_a` in return
 		#[transactional]
 		fn swap(
 			who: &Self::AccountId,
 			pool_id: Self::PoolId,
 			pair: CurrencyPair<Self::AssetId>,
-			quote_amount: Self::Balance,
+			amount_b: Self::Balance,
 		) -> Result<Self::Balance, DispatchError> {
-			todo!();
-			Ok(Self::Balance::zero())
+			let pool = Self::get_pool(pool_id)?;
+			let pool_account = Self::account_id(&pool_id);
+
+			ensure!(pair == pool.pair, Error::<T>::PairMismatch);
+
+			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
+
+			// Convert to u128 for calculations
+			let amount_b = T::Convert::convert(amount_b);
+			let (reserve_a, reserve_b) =
+				(T::Convert::convert(reserve_a), T::Convert::convert(reserve_b));
+
+			println!(
+				"amount_b: {:?}, reserve_a: {:?}, reserve_b: {:?}",
+				amount_b, reserve_a, reserve_b
+			);
+			let amount_a = amount_b
+				.checked_mul(reserve_b)
+				.and_then(|x| x.checked_div(reserve_a.checked_sub(amount_b).unwrap_or(0u128)));
+
+			println!("amount_a: {:?}", amount_a);
+			ensure!(amount_a.is_some(), Error::<T>::InvalidAmount);
+
+			// Convert back to balances
+			let amount_a = T::Convert::convert(amount_a.unwrap());
+			ensure!(!amount_a.is_zero(), Error::<T>::InvalidAmount);
+			let amount_b = T::Convert::convert(amount_b);
+
+			T::Assets::transfer(pair.token_b, who, &pool_account, amount_b)?;
+			T::Assets::transfer(pair.token_a, &pool_account, who, amount_a)?;
+
+			let fee = pool.fee;
+			// Self::disburse_fees(who, &pool_id, &owner, &fees)?;
+			// Self::update_twap(pool_id)?;
+			Self::deposit_event(Event::<T>::Swapped {
+				pool_id,
+				who: who.clone(),
+				token_a: pair.token_a,
+				token_b: pair.token_b,
+				amount_a,
+				amount_b,
+				fee,
+			});
+			Ok(amount_a)
 		}
 	}
 }

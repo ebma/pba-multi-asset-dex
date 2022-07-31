@@ -4,10 +4,27 @@ use scale_info::TypeInfo;
 use sp_runtime::{DispatchError, Permill};
 use sp_std::cmp::Ordering;
 
-#[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, PartialEq, Eq, TypeInfo)]
+#[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, Eq, TypeInfo)]
 pub struct CurrencyPair<AssetId> {
 	pub token_a: AssetId,
 	pub token_b: AssetId,
+}
+
+impl<AssetId: Copy + PartialEq> CurrencyPair<AssetId> {
+	pub fn swap(&self) -> Self {
+		Self { token_a: self.token_b, token_b: self.token_a }
+	}
+
+	pub fn contains(&self, asset_id: AssetId) -> bool {
+		self.token_a == asset_id || self.token_b == asset_id
+	}
+}
+
+impl<AssetId: PartialEq> PartialEq for CurrencyPair<AssetId> {
+	fn eq(&self, other: &Self) -> bool {
+		(self.token_a == other.token_a && self.token_b == other.token_b) ||
+			(self.token_a == other.token_b && self.token_b == other.token_a)
+	}
 }
 
 #[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, PartialEq, Eq, TypeInfo)]
@@ -71,6 +88,6 @@ pub trait Amm {
 		who: &Self::AccountId,
 		pool_id: Self::PoolId,
 		pair: CurrencyPair<Self::AssetId>,
-		quote_amount: Self::Balance,
+		amount_b: Self::Balance,
 	) -> Result<Self::Balance, DispatchError>;
 }

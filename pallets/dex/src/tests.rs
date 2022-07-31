@@ -10,7 +10,7 @@ use crate::{
 	mock,
 	mock::*,
 	traits::{CurrencyPair, Pool},
-	Error,
+	Error, PoolOf,
 };
 
 pub fn assert_has_event<T, F>(matcher: F)
@@ -31,7 +31,7 @@ where
 	assert!(matcher(last_event));
 }
 
-fn create_default_pool() -> Pool<AccountId, AssetId> {
+fn create_default_pool() -> PoolOf<Test> {
 	let owner: AccountId = ALICE;
 	let first = ASSET_1;
 	let second = ASSET_2;
@@ -39,7 +39,7 @@ fn create_default_pool() -> Pool<AccountId, AssetId> {
 
 	let lp_token = ASSET_3;
 
-	let fee: Permill = Permill::from_percent(3);
+	let fee = Permill::from_percent(3);
 
 	Pool { owner, pair, lp_token, fee }
 }
@@ -161,6 +161,48 @@ fn add_and_remove_liquidity_should_work() {
 			matches!(e.event,
             mock::Event::Dex(crate::Event::LiquidityRemoved {who, pool_id, amount_a, amount_b, total_issuance})
             if who == ALICE && pool_id == pool_id && amount_a == expected_amount_a && amount_b == expected_amount_b && total_issuance == 0)
+		});
+	});
+}
+
+#[test]
+pub fn swap_should_work() {
+	run_test(|| {
+		let pool = create_default_pool();
+		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
+
+		// Add liquidity to pool
+		let pool_id = 0;
+		let amount = 100;
+		let asset = ASSET_1;
+		assert_ok!(Dex::add_liquidity(Origin::signed(ALICE), pool_id, amount, asset));
+
+		let balance_1_pre_swap = Tokens::free_balance(ASSET_1, &ALICE);
+		let balance_2_pre_swap = Tokens::free_balance(ASSET_2, &ALICE);
+
+		let pair = CurrencyPair { token_a: ASSET_1, token_b: ASSET_2 };
+		let amount_to_swap = 10;
+		assert_ok!(Dex::swap(Origin::signed(ALICE), pool_id, pair, amount_to_swap));
+
+		// Expect to receive 11 tokens of token_a
+		let expected_amount_a = 11;
+		assert_eq!(
+			balance_1_pre_swap + expected_amount_a,
+			Tokens::free_balance(ASSET_1, &ALICE)
+		);
+
+		// Expect to spend 10 tokens of token_b
+		let expected_amount_b = amount_to_swap;
+		assert_eq!(
+			balance_2_pre_swap - expected_amount_b,
+			Tokens::free_balance(ASSET_2, &ALICE)
+		);
+
+		assert_last_event::<Test, _>(|e| {
+			matches!(e.event,
+            mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
+            if who == ALICE && pool_id == pool_id && amount_a == expected_amount_a && amount_b == expected_amount_b &&
+			token_a == pair.token_a && token_b == pair.token_b && fee == pool.fee)
 		});
 	});
 }

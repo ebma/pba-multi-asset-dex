@@ -6,7 +6,7 @@ use frame_support::{
 use frame_system as system;
 use orml_traits::parameter_type_with_key;
 pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
-use sp_arithmetic::{FixedI128, FixedU128};
+use sp_arithmetic::{FixedI128, FixedU128, Permill};
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
