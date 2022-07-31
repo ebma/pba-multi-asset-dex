@@ -186,23 +186,52 @@ pub fn swap_should_work() {
 
 		// Expect to receive 9 tokens of token_a
 		let expected_amount_a = 9;
-		assert_eq!(
-			balance_1_pre_swap + expected_amount_a,
-			Tokens::free_balance(ASSET_1, &ALICE)
-		);
+		assert_eq!(balance_1_pre_swap + expected_amount_a, Tokens::free_balance(ASSET_1, &ALICE));
 
 		// Expect to spend 10 tokens of token_b
 		let expected_amount_b = amount_to_swap;
-		assert_eq!(
-			balance_2_pre_swap - expected_amount_b,
-			Tokens::free_balance(ASSET_2, &ALICE)
-		);
+		assert_eq!(balance_2_pre_swap - expected_amount_b, Tokens::free_balance(ASSET_2, &ALICE));
 
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
             mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
             if who == ALICE && pool_id == pool_id && amount_a == expected_amount_a && amount_b == expected_amount_b &&
 			token_a == pair.token_a && token_b == pair.token_b && fee == pool.fee)
+		});
+	});
+}
+
+#[test]
+fn sell_should_work() {
+	run_test(|| {
+		let pool = create_default_pool();
+		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
+
+		// Add liquidity to pool
+		let pool_id = 0;
+		let amount = 100;
+		let asset = ASSET_1;
+		assert_ok!(Dex::add_liquidity(Origin::signed(ALICE), pool_id, amount, asset));
+
+		let balance_1_pre_swap = Tokens::free_balance(ASSET_1, &ALICE);
+		let balance_2_pre_swap = Tokens::free_balance(ASSET_2, &ALICE);
+
+		let asset = ASSET_1;
+		let amount_to_sell = 10;
+		assert_ok!(Dex::sell(Origin::signed(ALICE), pool_id, asset, amount_to_sell));
+
+		// Expect to spend 10 tokens of token_a
+		assert_eq!(balance_1_pre_swap - amount_to_sell, Tokens::free_balance(ASSET_1, &ALICE));
+
+		// Expect to receive 9 tokens of token_b
+		let amount_to_receive = 9;
+		assert_eq!(balance_2_pre_swap + amount_to_receive, Tokens::free_balance(ASSET_2, &ALICE));
+
+		assert_last_event::<Test, _>(|e| {
+			matches!(e.event,
+            mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
+            if who == ALICE && pool_id == pool_id && amount_a == amount_to_receive && amount_b == amount_to_sell &&
+			token_a == ASSET_2 && token_b == ASSET_1 && fee == pool.fee)
 		});
 	});
 }

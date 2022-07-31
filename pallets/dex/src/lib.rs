@@ -238,6 +238,19 @@ pub mod pallet {
 			<Self as Amm>::swap(&who, pool_id, pair, amount_b)?;
 			Ok(())
 		}
+
+		#[pallet::weight(10_000)]
+		pub fn sell(
+			origin: OriginFor<T>,
+			pool_id: PoolIdOf<T>,
+			asset_id: AssetIdOf<T>,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			<Self as Amm>::sell(&who, pool_id, asset_id, amount)?;
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -262,7 +275,6 @@ pub mod pallet {
 			Ok(pool_id)
 		}
 
-
 		fn get_amount_out(
 			amount_in: u128,
 			reserve_in: u128,
@@ -280,6 +292,28 @@ pub mod pallet {
 			Ok(numerator.saturating_div(denominator))
 		}
 
+		#[transactional]
+		fn distribute_fees(
+			who: &AccountIdOf<T>,
+			pool_id: &PoolIdOf<T>,
+			fee: Permill,
+		) -> Result<(), DispatchError> {
+			// if !fee.is_zero() {
+			// 	let staking_reward_pools = StakingRewardPools::<T>::get(&pool_id)
+			// 		.ok_or(Error::<T>::StakingPoolConfigError)?;
+			// 	for staking_reward_pool in staking_reward_pools {
+			// 		if staking_reward_pool.pool_type == RewardPoolType::PBLO {
+			// 			T::ProtocolStaking::transfer_reward(
+			// 				who,
+			// 				&staking_reward_pool.pool_id,
+			// 				fees.asset_id,
+			// 				fees.protocol_fee,
+			// 			)?;
+			// 		}
+			// 	}
+			// }
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Amm for Pallet<T> {
@@ -521,9 +555,7 @@ pub mod pallet {
 			T::Assets::transfer(pair.token_b, who, &pool_account, amount_b)?;
 			T::Assets::transfer(pair.token_a, &pool_account, who, amount_a)?;
 
-			let fee = pool.fee;
-			// Self::disburse_fees(who, &pool_id, &owner, &fees)?;
-			// Self::update_twap(pool_id)?;
+			Self::distribute_fees(who, &pool_id, pool.fee)?;
 			Self::deposit_event(Event::<T>::Swapped {
 				pool_id,
 				who: who.clone(),
@@ -531,7 +563,7 @@ pub mod pallet {
 				token_b: pair.token_b,
 				amount_a,
 				amount_b,
-				fee,
+				fee: pool.fee,
 			});
 			Ok(amount_a)
 		}
