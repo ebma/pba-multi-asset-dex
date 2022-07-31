@@ -96,6 +96,8 @@ pub type UnsignedFixedPoint = FixedU128;
 /// The `Inner` type of the `UnsignedFixedPoint`.
 pub type UnsignedInner = u128;
 
+pub type PoolId = u128;
+
 pub type BasicCurrencyAdapter<R, B> = orml_currencies::BasicCurrencyAdapter<R, B, Amount, Balance>;
 
 pub trait CurrencyInfo {
@@ -146,7 +148,7 @@ pub enum CurrencyId {
 	Native,
 }
 
-impl std::default::Default for CurrencyId {
+impl sp_std::default::Default for CurrencyId {
 	fn default() -> Self {
 		CurrencyId::Native
 	}

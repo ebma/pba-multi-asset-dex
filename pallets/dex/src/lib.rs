@@ -264,6 +264,7 @@ pub mod pallet {
 			}
 		}
 
+		// Return the balances of the assets in the pool.
 		fn pool_reserves(
 			pool_id: Self::PoolId,
 		) -> Result<(Self::Balance, Self::Balance), DispatchError> {

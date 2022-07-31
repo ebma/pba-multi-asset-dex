@@ -2,7 +2,7 @@ use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use frame_support::RuntimeDebug;
 use scale_info::TypeInfo;
 use sp_runtime::{DispatchError, Permill};
-use std::cmp::Ordering;
+use sp_std::cmp::Ordering;
 
 #[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, PartialEq, Eq, TypeInfo)]
 pub struct CurrencyPair<AssetId> {

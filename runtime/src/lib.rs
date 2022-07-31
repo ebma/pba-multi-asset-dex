@@ -17,6 +17,7 @@ pub use frame_support::{
 	},
 	StorageValue,
 };
+use frame_support::PalletId;
 // A few exports that help ease life for downstream crates.
 use frame_support::traits::{AsEnsureOriginWithArg, Contains};
 pub use frame_system::Call as SystemCall;
@@ -42,6 +43,7 @@ use sp_runtime::{
 	ApplyExtrinsicResult, MultiSignature,
 };
 pub use sp_runtime::{Perbill, Permill};
+use sp_runtime::traits::ConvertInto;
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -50,7 +52,7 @@ use sp_version::RuntimeVersion;
 pub mod constants;
 use constants::{currency::*, time::*};
 pub use pallet_dex;
-use primitives::BasicCurrencyAdapter;
+use primitives::{BasicCurrencyAdapter, PoolId};
 pub use primitives::{
 	self, AccountId, Amount, Balance, BlockNumber, CurrencyId, CurrencyId::Token, CurrencyInfo,
 	Hash, Index, Moment, Nonce, Signature, SignedFixedPoint, SignedInner, TokenSymbol,
@@ -319,15 +321,21 @@ impl pallet_uniques::Config for Runtime {
 	type WeightInfo = ();
 }
 
+
+parameter_types! {
+	pub const DexPalletId: PalletId = PalletId(*b"dex_pall");
+}
+
 /// Configure the pallet-dex
 impl pallet_dex::Config for Runtime {
 	type Event = Event;
-	type SignedInner = SignedInner;
-	type SignedFixedPoint = SignedFixedPoint;
-	type UnsignedFixedPoint = UnsignedFixedPoint;
 	type Balance = Balance;
-	type Currencies = Currencies;
+	type Assets = Tokens;
 	type GetNativeCurrencyId = GetNativeCurrencyId;
+	type AssetId = CurrencyId;
+	type PoolId = PoolId;
+	type PalletId = DexPalletId;
+	type Convert = ConvertInto;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
