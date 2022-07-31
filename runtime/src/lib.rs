@@ -22,7 +22,7 @@ use frame_support::PalletId;
 use frame_support::traits::{AsEnsureOriginWithArg, Contains};
 pub use frame_system::Call as SystemCall;
 use frame_system::EnsureSigned;
-use orml_traits::parameter_type_with_key;
+use orml_traits::{parameter_type_with_key, MultiReservableCurrency};
 pub use pallet_balances::Call as BalancesCall;
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
@@ -302,11 +302,16 @@ parameter_types! {
 	pub const MaxCollectionsEquippablePerPart: u32 = 100;
 }
 
+parameter_types! {
+	pub const GetTokenId: CurrencyId = CurrencyId::Native;
+}
+
+
 impl pallet_uniques::Config for Runtime {
 	type Event = Event;
 	type CollectionId = u32;
 	type ItemId = u32;
-	type Currency = Balances; // Todo change me to Currencies
+	type Currency = orml_tokens::CurrencyAdapter<Runtime, GetTokenId>;
 	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
 	type Locker = (); // TODO change me
@@ -330,11 +335,11 @@ parameter_types! {
 impl pallet_dex::Config for Runtime {
 	type Event = Event;
 	type Balance = Balance;
-	type Assets = Tokens;
 	type GetNativeCurrencyId = GetNativeCurrencyId;
 	type AssetId = CurrencyId;
 	type PoolId = PoolId;
 	type PalletId = DexPalletId;
+	type Assets = Tokens;
 	type Convert = ConvertInto;
 }
 
