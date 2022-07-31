@@ -1,6 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use calc::compute_deposit_lp;
 use codec::{EncodeLike, FullCodec};
 use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
 use orml_traits::{arithmetic::CheckedAdd, MultiCurrency, MultiReservableCurrency};
@@ -17,10 +16,12 @@ use sp_std::{
 	marker::PhantomData,
 };
 
+use calc::compute_deposit_lp;
 pub use pallet::*;
 use primitives::TruncateFixedPointToInt;
 pub use types::CurrencyId;
 use types::*;
+
 mod calc;
 mod traits;
 mod types;
@@ -38,7 +39,7 @@ mod benchmarking;
 pub mod pallet {
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::Convert;
+	use sp_runtime::traits::{CheckedMul, Convert};
 
 	use crate::traits::{Amm, CurrencyPair, Pool};
 
@@ -148,6 +149,8 @@ pub mod pallet {
 		PoolNotFound,
 		MaximumPoolCountReached,
 		InvalidAmount,
+		InvalidAsset,
+		InvalidExchangeValue,
 	}
 
 	#[pallet::call]
@@ -235,13 +238,31 @@ pub mod pallet {
 			Ok(pool.lp_token)
 		}
 
+		// Calculate the value of a given asset in a given pool based on the other asset in the
+		// currency pair.
 		fn get_exchange_value(
 			pool_id: Self::PoolId,
 			asset_id: Self::AssetId,
 			amount: Self::Balance,
 		) -> Result<Self::Balance, DispatchError> {
-			todo!();
-			Ok(Self::Balance::zero())
+			let pool = Self::get_pool(pool_id)?;
+			let pool_account = Self::account_id(&pool_id);
+			let pair = pool.pair;
+			let reserve_a = T::Convert::convert(T::Assets::free_balance(pair.first, &pool_account));
+			let reserve_b =
+				T::Convert::convert(T::Assets::free_balance(pair.second, &pool_account));
+
+			let quote = if pair.first == asset_id {
+				amount.checked_mul(reserve_b).and_then(|x| x.checked_div(reserve_a))
+			} else if pair.second == asset_id {
+				amount.checked_mul(reserve_a).and_then(|x| x.checked_div(reserve_b))
+			} else {
+				return Err(Error::<T>::InvalidAsset.into())
+			};
+			match quote {
+				Some(x) => Ok(x),
+				None => Err(Error::<T>::InvalidAmount.into()),
+			}
 		}
 
 		#[transactional]
@@ -276,10 +297,16 @@ pub mod pallet {
 			let pool = Self::get_pool(pool_id)?;
 			let pool_account = Self::account_id(&pool_id);
 
-			let pool_base_aum =
+			let first_balance =
 				T::Convert::convert(T::Assets::free_balance(pool.pair.first, &pool_account));
-			let pool_quote_aum =
+
+			let second_balance =
 				T::Convert::convert(T::Assets::free_balance(pool.pair.second, &pool_account));
+
+			// let pool_base_aum =
+			// 	T::Convert::convert(T::Assets::free_balance(pool.pair.first, &pool_account));
+			// let pool_quote_aum =
+			// 	T::Convert::convert(T::Assets::free_balance(pool.pair.second, &pool_account));
 
 			let lp_total_issuance = T::Convert::convert(T::Assets::total_issuance(pool.lp_token));
 			let (second_amount, amount_of_lp_token_to_mint) = compute_deposit_lp(
@@ -296,18 +323,14 @@ pub mod pallet {
 
 			T::Assets::transfer(pool.pair.first, who, &pool_account, first_amount)?;
 			T::Assets::transfer(pool.pair.second, who, &pool_account, second_amount)?;
-			// T::Assets::mint_into(pool.lp_token, who, amount_of_lp_token_to_mint)?;
+			T::Assets::deposit(pool.lp_token, who, amount_of_lp_token_to_mint)?;
 
-			// TODO
-			let first_amount: BalanceOf<T> = Self::Balance::zero();
-			let second_amount: BalanceOf<T> = Self::Balance::zero();
-			let minted_lp: BalanceOf<T> = Self::Balance::zero();
 			Self::deposit_event(Event::<T>::LiquidityAdded {
 				who: who.clone(),
 				pool_id,
 				first_amount,
 				second_amount,
-				minted_lp,
+				minted_lp: amount_of_lp_token_to_mint,
 			});
 			Ok(())
 		}

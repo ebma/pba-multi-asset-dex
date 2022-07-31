@@ -10,7 +10,6 @@ pub struct CurrencyPair<AssetId> {
 	pub second: AssetId,
 }
 
-// #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Debug, Clone)]
 #[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, PartialEq, Eq, TypeInfo)]
 pub struct Pool<AccountId, AssetId: Ord> {
 	pub owner: AccountId,
