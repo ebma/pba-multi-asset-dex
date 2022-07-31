@@ -2,6 +2,7 @@
 
 use codec::{EncodeLike, FullCodec};
 use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
+use num_integer::{sqrt, Roots};
 use orml_traits::{arithmetic::CheckedAdd, MultiCurrency, MultiReservableCurrency};
 use scale_info::TypeInfo;
 use sp_runtime::{
@@ -39,7 +40,7 @@ mod benchmarking;
 pub mod pallet {
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{CheckedMul, Convert};
+	use sp_runtime::traits::{CheckedMul, Convert, Saturating};
 
 	use crate::traits::{Amm, CurrencyPair, Pool};
 
@@ -47,11 +48,9 @@ pub mod pallet {
 
 	pub(crate) type AssetIdOf<T> = <T as Config>::AssetId;
 	pub(crate) type BalanceOf<T> = <T as Config>::Balance;
-	// pub(crate) type BalanceOf<T> = <T as orml_tokens::Config>::Balance;
 	pub(crate) type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 	pub(crate) type PoolOf<T> = Pool<AccountIdOf<T>, AssetIdOf<T>>;
-
-	type PoolIdOf<T> = <T as Config>::PoolId;
+	pub(crate) type PoolIdOf<T> = <T as Config>::PoolId;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -309,13 +308,14 @@ pub mod pallet {
 			let pool = Self::get_pool(pool_id)?;
 			let pool_account = Self::account_id(&pool_id);
 
-			let (amount_a, amount_b) = if pool.pair.token_a == asset {
-				let other_amount =
-					Self::get_exchange_value(pool_id, pool.pair.token_b, amount)?.into();
+			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
+			let (amount_a, amount_b) = if reserve_a.is_zero() && reserve_b.is_zero() {
+				(amount, amount)
+			} else if pool.pair.token_a == asset {
+				let other_amount = Self::get_exchange_value(pool_id, pool.pair.token_b, amount)?;
 				(amount, other_amount)
 			} else if pool.pair.token_b == asset {
-				let other_amount =
-					Self::get_exchange_value(pool_id, pool.pair.token_a, amount)?.into();
+				let other_amount = Self::get_exchange_value(pool_id, pool.pair.token_a, amount)?;
 				(other_amount, amount)
 			} else {
 				return Err(Error::<T>::InvalidAsset.into())
@@ -331,17 +331,29 @@ pub mod pallet {
 				return Err(Error::<T>::InsufficientBalance.into())
 			}
 
-			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
-			let lp_total_issuance = (T::Assets::total_issuance(pool.lp_token));
-			let amount_of_lp_token_to_mint: BalanceOf<T>;
-			if lp_total_issuance.is_zero() {
-				// TODO
-				amount_of_lp_token_to_mint = amount_a;
-			} else {
-				amount_of_lp_token_to_mint = amount_a;
-			}
+			// Convert to u128 for calculations
+			let (amount_a, amount_b) =
+				(T::Convert::convert(amount_a), T::Convert::convert(amount_b));
 
-			let amount_of_lp_token_to_mint = amount_of_lp_token_to_mint;
+			let lp_total_issuance = T::Convert::convert(T::Assets::total_issuance(pool.lp_token));
+			let amount_of_lp_token_to_mint = if lp_total_issuance == 0 {
+				let product = amount_a.saturating_mul(amount_b);
+				sqrt(product)
+			} else {
+				core::cmp::min(
+					amount_a
+						.saturating_mul(lp_total_issuance)
+						.saturating_div(T::Convert::convert(reserve_a)),
+					amount_b
+						.saturating_mul(lp_total_issuance)
+						.saturating_div(T::Convert::convert(reserve_b)),
+				)
+			};
+
+			// Convert back to balances
+			let (amount_a, amount_b) =
+				(T::Convert::convert(amount_a), T::Convert::convert(amount_b));
+			let amount_of_lp_token_to_mint = T::Convert::convert(amount_of_lp_token_to_mint);
 
 			T::Assets::transfer(pool.pair.token_a, who, &pool_account, amount_a)?;
 			T::Assets::transfer(pool.pair.token_b, who, &pool_account, amount_b)?;

@@ -136,7 +136,7 @@ pub const DARWIN: AccountId = 4;
 
 pub const ASSET_1: AssetId = 1;
 pub const ASSET_2: AssetId = 2;
-pub const ASSET_3: AssetId = 2;
+pub const ASSET_3: AssetId = 3;
 
 pub const BALANCES: [(AccountId, Balance); 4] =
 	[(ALICE, 1000), (BOB, 1000), (CHARLIE, 1000), (DARWIN, 1000)];
@@ -152,7 +152,7 @@ pub fn new_test_ext_multi_currency() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
 
 	let balances: Vec<(AccountId, AssetId, Balance)> =
-		vec![(ALICE, ASSET_1, 1000), (BOB, ASSET_2, 1000)];
+		vec![(ALICE, ASSET_1, 1000), (ALICE, ASSET_2, 1000), (BOB, ASSET_1, 1000)];
 
 	orml_tokens::GenesisConfig::<Test> { balances }
 		.assimilate_storage(&mut t)
