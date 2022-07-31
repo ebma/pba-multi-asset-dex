@@ -184,8 +184,8 @@ pub fn swap_should_work() {
 		let amount_to_swap = 10;
 		assert_ok!(Dex::swap(Origin::signed(ALICE), pool_id, pair, amount_to_swap));
 
-		// Expect to receive 11 tokens of token_a
-		let expected_amount_a = 11;
+		// Expect to receive 9 tokens of token_a
+		let expected_amount_a = 9;
 		assert_eq!(
 			balance_1_pre_swap + expected_amount_a,
 			Tokens::free_balance(ASSET_1, &ALICE)

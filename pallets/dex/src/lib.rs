@@ -17,7 +17,6 @@ use sp_std::{
 	marker::PhantomData,
 };
 
-use calc::compute_deposit_lp;
 pub use pallet::*;
 use primitives::TruncateFixedPointToInt;
 pub use types::CurrencyId;
@@ -171,6 +170,8 @@ pub mod pallet {
 		InvalidAmount,
 		InvalidAsset,
 		InsufficientBalance,
+		InsufficientInputAmount,
+		InsufficientLiquidity,
 		InsufficientLiquidityBalance,
 		InvalidExchangeValue,
 		WithdrawWithoutSupply,
@@ -260,6 +261,25 @@ pub mod pallet {
 				})?;
 			Ok(pool_id)
 		}
+
+
+		fn get_amount_out(
+			amount_in: u128,
+			reserve_in: u128,
+			reserve_out: u128,
+		) -> Result<u128, DispatchError> {
+			if !(amount_in > 0) {
+				return Err(Error::<T>::InsufficientInputAmount.into())
+			}
+			if !(reserve_in > 0 && reserve_out > 0) {
+				return Err(Error::<T>::InsufficientLiquidity.into())
+			}
+			let amount_in_with_fee = amount_in.saturating_mul(997);
+			let numerator = amount_in_with_fee.saturating_mul(reserve_out);
+			let denominator = reserve_in.saturating_mul(1000).saturating_add(amount_in_with_fee);
+			Ok(numerator.saturating_div(denominator))
+		}
+
 	}
 
 	impl<T: Config> Amm for Pallet<T> {
@@ -471,14 +491,13 @@ pub mod pallet {
 
 		// Execute a swap and return the amount of tokens received by executing the swap
 		// The order of assets in the CurrencyPair will decide how the swap is executed
-		// `amount_b` specifies how much of `token_b` (the second asset in the pair) the user wants
-		// to trade to get some amount of `token_a` in return
+		// The user will spend `amount_b_in` tokens of token b to receive some tokens of token_a
 		#[transactional]
 		fn swap(
 			who: &Self::AccountId,
 			pool_id: Self::PoolId,
 			pair: CurrencyPair<Self::AssetId>,
-			amount_b: Self::Balance,
+			amount_b_in: Self::Balance,
 		) -> Result<Self::Balance, DispatchError> {
 			let pool = Self::get_pool(pool_id)?;
 			let pool_account = Self::account_id(&pool_id);
@@ -488,24 +507,15 @@ pub mod pallet {
 			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
 
 			// Convert to u128 for calculations
-			let amount_b = T::Convert::convert(amount_b);
+			let amount_b = T::Convert::convert(amount_b_in);
 			let (reserve_a, reserve_b) =
 				(T::Convert::convert(reserve_a), T::Convert::convert(reserve_b));
 
-			println!(
-				"amount_b: {:?}, reserve_a: {:?}, reserve_b: {:?}",
-				amount_b, reserve_a, reserve_b
-			);
-			let amount_a = amount_b
-				.checked_mul(reserve_b)
-				.and_then(|x| x.checked_div(reserve_a.checked_sub(amount_b).unwrap_or(0u128)));
-
-			println!("amount_a: {:?}", amount_a);
-			ensure!(amount_a.is_some(), Error::<T>::InvalidAmount);
+			let amount_a = Self::get_amount_out(amount_b, reserve_b, reserve_a)?;
+			ensure!(amount_a > 0, Error::<T>::InvalidAmount);
 
 			// Convert back to balances
-			let amount_a = T::Convert::convert(amount_a.unwrap());
-			ensure!(!amount_a.is_zero(), Error::<T>::InvalidAmount);
+			let amount_a = T::Convert::convert(amount_a);
 			let amount_b = T::Convert::convert(amount_b);
 
 			T::Assets::transfer(pair.token_b, who, &pool_account, amount_b)?;
