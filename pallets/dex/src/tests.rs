@@ -32,7 +32,7 @@ fn create_default_pool() -> Pool<AccountId, AssetId> {
 	let owner: AccountId = ALICE;
 	let first = ASSET_1;
 	let second = ASSET_2;
-	let pair = CurrencyPair { first, second };
+	let pair = CurrencyPair { token_a: first, token_b: second };
 
 	let lp_token = ASSET_3;
 

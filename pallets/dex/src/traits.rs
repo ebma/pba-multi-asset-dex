@@ -6,8 +6,8 @@ use std::cmp::Ordering;
 
 #[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, PartialEq, Eq, TypeInfo)]
 pub struct CurrencyPair<AssetId> {
-	pub first: AssetId,
-	pub second: AssetId,
+	pub token_a: AssetId,
+	pub token_b: AssetId,
 }
 
 #[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, PartialEq, Eq, TypeInfo)]
@@ -29,6 +29,10 @@ pub trait Amm {
 	fn currency_pair(pool_id: Self::PoolId) -> Result<CurrencyPair<Self::AssetId>, DispatchError>;
 
 	fn lp_token(pool_id: Self::PoolId) -> Result<Self::AssetId, DispatchError>;
+
+	fn pool_reserves(
+		pool_id: Self::PoolId,
+	) -> Result<(Self::Balance, Self::Balance), DispatchError>;
 
 	fn get_exchange_value(
 		pool_id: Self::PoolId,
@@ -53,8 +57,8 @@ pub trait Amm {
 	fn add_liquidity(
 		who: &Self::AccountId,
 		pool_id: Self::PoolId,
-		first_amount: Self::Balance,
-		second_amount: Self::Balance,
+		amount: Self::Balance,
+		asset: Self::AssetId,
 	) -> Result<(), DispatchError>;
 
 	fn remove_liquidity(

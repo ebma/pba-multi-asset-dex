@@ -137,8 +137,8 @@ pub mod pallet {
 		LiquidityAdded {
 			who: T::AccountId,
 			pool_id: T::PoolId,
-			first_amount: BalanceOf<T>,
-			second_amount: BalanceOf<T>,
+			amount_a: BalanceOf<T>,
+			amount_b: BalanceOf<T>,
 			minted_lp: BalanceOf<T>,
 		},
 	}
@@ -150,6 +150,7 @@ pub mod pallet {
 		MaximumPoolCountReached,
 		InvalidAmount,
 		InvalidAsset,
+		InsufficientBalance,
 		InvalidExchangeValue,
 	}
 
@@ -180,12 +181,12 @@ pub mod pallet {
 		pub fn add_liquidity(
 			origin: OriginFor<T>,
 			pool_id: T::PoolId,
-			first_amount: BalanceOf<T>,
-			second_amount: BalanceOf<T>,
+			amount: BalanceOf<T>,
+			asset: AssetIdOf<T>,
 		) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
-			<Self as Amm>::add_liquidity(&sender, pool_id, first_amount, second_amount)?;
+			<Self as Amm>::add_liquidity(&sender, pool_id, amount, asset)?;
 
 			Ok(())
 		}
@@ -248,14 +249,13 @@ pub mod pallet {
 			let pool = Self::get_pool(pool_id)?;
 			let pool_account = Self::account_id(&pool_id);
 			let pair = pool.pair;
-			let reserve_a = T::Convert::convert(T::Assets::free_balance(pair.first, &pool_account));
-			let reserve_b =
-				T::Convert::convert(T::Assets::free_balance(pair.second, &pool_account));
+			let reserve_a = (T::Assets::free_balance(pair.token_a, &pool_account));
+			let reserve_b = (T::Assets::free_balance(pair.token_b, &pool_account));
 
-			let quote = if pair.first == asset_id {
-				amount.checked_mul(reserve_b).and_then(|x| x.checked_div(reserve_a))
-			} else if pair.second == asset_id {
-				amount.checked_mul(reserve_a).and_then(|x| x.checked_div(reserve_b))
+			let quote = if pair.token_a == asset_id {
+				amount.checked_mul(&reserve_b).and_then(|x| x.checked_div(&reserve_a))
+			} else if pair.token_b == asset_id {
+				amount.checked_mul(&reserve_a).and_then(|x| x.checked_div(&reserve_b))
 			} else {
 				return Err(Error::<T>::InvalidAsset.into())
 			};
@@ -263,6 +263,18 @@ pub mod pallet {
 				Some(x) => Ok(x),
 				None => Err(Error::<T>::InvalidAmount.into()),
 			}
+		}
+
+		fn pool_reserves(
+			pool_id: Self::PoolId,
+		) -> Result<(Self::Balance, Self::Balance), DispatchError> {
+			let pool = Self::get_pool(pool_id)?;
+			let pool_account = Self::account_id(&pool_id);
+
+			let pair = pool.pair;
+			let reserve_a = T::Assets::free_balance(pair.token_a, &pool_account);
+			let reserve_b = T::Assets::free_balance(pair.token_b, &pool_account);
+			Ok((reserve_a, reserve_b))
 		}
 
 		#[transactional]
@@ -291,45 +303,55 @@ pub mod pallet {
 		fn add_liquidity(
 			who: &Self::AccountId,
 			pool_id: Self::PoolId,
-			first_amount: Self::Balance,
-			second_amount: Self::Balance,
+			amount: Self::Balance,
+			asset: Self::AssetId,
 		) -> Result<(), DispatchError> {
 			let pool = Self::get_pool(pool_id)?;
 			let pool_account = Self::account_id(&pool_id);
 
-			let first_balance =
-				T::Convert::convert(T::Assets::free_balance(pool.pair.first, &pool_account));
+			let (amount_a, amount_b) = if pool.pair.token_a == asset {
+				let other_amount =
+					Self::get_exchange_value(pool_id, pool.pair.token_b, amount)?.into();
+				(amount, other_amount)
+			} else if pool.pair.token_b == asset {
+				let other_amount =
+					Self::get_exchange_value(pool_id, pool.pair.token_a, amount)?.into();
+				(other_amount, amount)
+			} else {
+				return Err(Error::<T>::InvalidAsset.into())
+			};
 
-			let second_balance =
-				T::Convert::convert(T::Assets::free_balance(pool.pair.second, &pool_account));
+			let user_balance_a = T::Assets::free_balance(pool.pair.token_a, who);
+			if user_balance_a < amount_a {
+				return Err(Error::<T>::InsufficientBalance.into())
+			}
 
-			// let pool_base_aum =
-			// 	T::Convert::convert(T::Assets::free_balance(pool.pair.first, &pool_account));
-			// let pool_quote_aum =
-			// 	T::Convert::convert(T::Assets::free_balance(pool.pair.second, &pool_account));
+			let user_balance_b = T::Assets::free_balance(pool.pair.token_b, who);
+			if user_balance_b < amount_b {
+				return Err(Error::<T>::InsufficientBalance.into())
+			}
 
-			let lp_total_issuance = T::Convert::convert(T::Assets::total_issuance(pool.lp_token));
-			let (second_amount, amount_of_lp_token_to_mint) = compute_deposit_lp(
-				lp_total_issuance,
-				T::Convert::convert(first_amount),
-				T::Convert::convert(second_amount),
-				pool_base_aum,
-				pool_quote_aum,
-			)?;
-			let second_amount = T::Convert::convert(second_amount);
-			let amount_of_lp_token_to_mint = T::Convert::convert(amount_of_lp_token_to_mint);
+			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
+			let lp_total_issuance = (T::Assets::total_issuance(pool.lp_token));
+			let amount_of_lp_token_to_mint: BalanceOf<T>;
+			if lp_total_issuance.is_zero() {
+				// TODO
+				amount_of_lp_token_to_mint = amount_a;
+			} else {
+				amount_of_lp_token_to_mint = amount_a;
+			}
 
-			ensure!(second_amount > Self::Balance::zero(), Error::<T>::InvalidAmount);
+			let amount_of_lp_token_to_mint = amount_of_lp_token_to_mint;
 
-			T::Assets::transfer(pool.pair.first, who, &pool_account, first_amount)?;
-			T::Assets::transfer(pool.pair.second, who, &pool_account, second_amount)?;
+			T::Assets::transfer(pool.pair.token_a, who, &pool_account, amount_a)?;
+			T::Assets::transfer(pool.pair.token_b, who, &pool_account, amount_b)?;
 			T::Assets::deposit(pool.lp_token, who, amount_of_lp_token_to_mint)?;
 
 			Self::deposit_event(Event::<T>::LiquidityAdded {
 				who: who.clone(),
 				pool_id,
-				first_amount,
-				second_amount,
+				amount_a,
+				amount_b,
 				minted_lp: amount_of_lp_token_to_mint,
 			});
 			Ok(())
