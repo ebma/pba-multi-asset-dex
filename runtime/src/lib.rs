@@ -350,7 +350,7 @@ construct_runtime!(
 		Currencies: orml_currencies,
 		Tokens: orml_tokens,
 		// Include the custom logic from the pallet-dex in the runtime.
-		DexModule: pallet_dex,
+		Dex: pallet_dex,
 	}
 );
 
@@ -391,7 +391,7 @@ mod benches {
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
-		[pallet_dex, DexModule]
+		[pallet_dex, Dex]
 	);
 }
 
