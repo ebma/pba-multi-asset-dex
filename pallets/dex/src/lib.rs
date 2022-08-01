@@ -37,9 +37,11 @@ pub mod pallet {
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
 	use sp_arithmetic::{PerThing, Permill, UpperOf};
-	use sp_runtime::traits::{CheckedAdd, CheckedMul, CheckedSub, Convert, Saturating};
+	use sp_runtime::traits::{
+		CheckedAdd, CheckedMul, CheckedSub, Convert, Saturating, StaticLookup,
+	};
 
-	use crate::traits::{Amm, CurrencyPair, Pool};
+	use crate::traits::{Amm, CurrencyPair, Pool, PoolCreationParams};
 
 	use super::*;
 
@@ -47,13 +49,12 @@ pub mod pallet {
 	pub(crate) type BalanceOf<T> = <T as Config>::Balance;
 	pub(crate) type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 	pub(crate) type PoolOf<T> = Pool<AccountIdOf<T>, AssetIdOf<T>>;
+	pub(crate) type PoolCreationParamsOf<T> = PoolCreationParams<AccountIdOf<T>, AssetIdOf<T>>;
 	pub(crate) type PoolIdOf<T> = <T as Config>::PoolId;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config:
-		frame_system::Config
-	{
+	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
@@ -101,6 +102,13 @@ pub mod pallet {
 		>;
 
 		type Convert: Convert<u128, BalanceOf<Self>> + Convert<BalanceOf<Self>, u128>;
+
+		/// This is used to derive the AssetId of the liquidity token.
+		/// The derivation is supposed to happen based on the two AssetIds of the assets in a pair
+		type LiquidityTokenConversion: StaticLookup<
+			Source = AssetIdOf<Self>,
+			Target = (AssetIdOf<Self>, AssetIdOf<Self>),
+		>;
 	}
 
 	#[pallet::pallet]
@@ -175,15 +183,18 @@ pub mod pallet {
 		///
 		/// Emits `PoolCreated` event when successful.
 		#[pallet::weight(10_000)]
-		pub fn create_pool(origin: OriginFor<T>, pool: PoolOf<T>) -> DispatchResult {
+		pub fn create_pool(
+			origin: OriginFor<T>,
+			pool_params: PoolCreationParamsOf<T>,
+		) -> DispatchResult {
 			let _ = ensure_signed(origin)?;
 
-			let pool_id = Self::_create_pool(pool.clone())?;
+			let pool_id = Self::_create_pool(pool_params.clone())?;
 
 			Self::deposit_event(Event::<T>::PoolCreated {
-				owner: pool.owner,
+				owner: pool_params.owner,
 				pool_id,
-				assets: pool.pair,
+				assets: pool_params.pair,
 			});
 
 			Ok(())
@@ -267,7 +278,21 @@ pub mod pallet {
 			T::PalletId::get().into_sub_account_truncating(pool_id)
 		}
 
-		fn _create_pool(pool: PoolOf<T>) -> Result<PoolIdOf<T>, DispatchError> {
+		fn _create_pool(
+			pool_params: PoolCreationParamsOf<T>,
+		) -> Result<PoolIdOf<T>, DispatchError> {
+			// Derive the lp token based on the pair
+			let pair = pool_params.pair;
+			let lp_token: AssetIdOf<T> =
+				T::LiquidityTokenConversion::unlookup((pair.token_a, pair.token_b));
+
+			let pool: PoolOf<T> = Pool {
+				lp_token,
+				pair: pool_params.pair,
+				owner: pool_params.owner,
+				fee: pool_params.fee,
+			};
+
 			let pool_id =
 				PoolCount::<T>::try_mutate(|pool_count| -> Result<T::PoolId, DispatchError> {
 					let pool_id = *pool_count;

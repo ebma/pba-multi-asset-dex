@@ -28,6 +28,13 @@ impl<AssetId: PartialEq> PartialEq for CurrencyPair<AssetId> {
 }
 
 #[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, PartialEq, Eq, TypeInfo)]
+pub struct PoolCreationParams<AccountId, AssetId: Ord> {
+	pub owner: AccountId,
+	pub pair: CurrencyPair<AssetId>,
+	pub fee: Permill,
+}
+
+#[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, PartialEq, Eq, TypeInfo)]
 pub struct Pool<AccountId, AssetId: Ord> {
 	pub owner: AccountId,
 	pub pair: CurrencyPair<AssetId>,

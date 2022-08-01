@@ -10,8 +10,8 @@ use primitives::TokenSymbol;
 use crate::{
 	mock,
 	mock::*,
-	traits::{CurrencyPair, Pool},
-	Error, PoolOf,
+	traits::{CurrencyPair, Pool, PoolCreationParams},
+	Error, PoolCreationParamsOf, PoolOf,
 };
 
 pub fn assert_has_event<T, F>(matcher: F)
@@ -32,17 +32,15 @@ where
 	assert!(matcher(last_event));
 }
 
-fn create_default_pool() -> PoolOf<Test> {
+fn create_default_pool_params() -> PoolCreationParamsOf<Test> {
 	let owner: AccountId = ALICE;
 	let first = ASSET_1;
 	let second = ASSET_2;
 	let pair = CurrencyPair { token_a: first, token_b: second };
 
-	let lp_token = ASSET_3;
-
 	let fee = Permill::from_percent(3);
 
-	Pool { owner, pair, lp_token, fee }
+	PoolCreationParams { owner, pair, fee }
 }
 
 /// Default value for deviation of computation error
@@ -62,10 +60,14 @@ fn assert_with_computation_error(expected: u128, value: u128, epsilon: u128) -> 
 #[test]
 fn create_pool_should_work() {
 	run_test(|| {
-		let pool = create_default_pool();
-		Dex::create_pool(Origin::signed(ALICE), pool);
+		let pool_params = create_default_pool_params();
+		Dex::create_pool(Origin::signed(ALICE), pool_params);
 
-		assert_eq!(Dex::pools(0), Some(pool));
+		let pool: PoolOf<Test> = Dex::pools(0).unwrap();
+		assert_eq!(pool.pair, pool_params.pair);
+		assert_eq!(pool.owner, pool_params.owner);
+		assert_eq!(pool.fee, pool_params.fee);
+		// assert_ok!(pool.lp_token);
 
 		assert_eq!(Dex::pool_count(), 1);
 
@@ -80,9 +82,12 @@ fn create_pool_should_work() {
 #[test]
 fn add_liquidity_should_work() {
 	run_test(|| {
-		let pool = create_default_pool();
+		let pool = create_default_pool_params();
 
 		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
+
+		let pool = Dex::pools(0).unwrap();
+		// assert_!(pool);
 
 		let balance_1_pre_deposit = Tokens::free_balance(ASSET_1, &ALICE);
 		let balance_2_pre_deposit = Tokens::free_balance(ASSET_2, &ALICE);
@@ -98,7 +103,7 @@ fn add_liquidity_should_work() {
 		// LP of initial deposit will be sqrt(amount_a*amount_b)
 		let expected_minted_lp = 100u128;
 		// Expect Alice to now have 100 LP tokens
-		assert_eq!(Tokens::free_balance(ASSET_3, &ALICE), expected_minted_lp);
+		assert_eq!(Tokens::free_balance(pool.lp_token, &ALICE), expected_minted_lp);
 
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
@@ -111,7 +116,7 @@ fn add_liquidity_should_work() {
 #[test]
 fn remove_liquidity_without_supply_should_fail() {
 	run_test(|| {
-		let pool = create_default_pool();
+		let pool = create_default_pool_params();
 
 		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
 
@@ -127,9 +132,11 @@ fn remove_liquidity_without_supply_should_fail() {
 #[test]
 fn add_and_remove_liquidity_should_work() {
 	run_test(|| {
-		let pool = create_default_pool();
+		let pool_params = create_default_pool_params();
 
-		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
+		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool_params));
+
+		let pool: PoolOf<Test> = Dex::pools(0).unwrap();
 
 		let balance_1_pre_deposit = Tokens::free_balance(ASSET_1, &ALICE);
 		let balance_2_pre_deposit = Tokens::free_balance(ASSET_2, &ALICE);
@@ -145,7 +152,7 @@ fn add_and_remove_liquidity_should_work() {
 		// LP of initial deposit will be sqrt(amount_a*amount_b)
 		let expected_minted_lp = 100u128;
 		// Expect Alice to now have 100 LP tokens
-		assert_eq!(Tokens::free_balance(ASSET_3, &ALICE), expected_minted_lp);
+		assert_eq!(Tokens::free_balance(pool.lp_token, &ALICE), expected_minted_lp);
 
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
@@ -183,8 +190,8 @@ fn add_and_remove_liquidity_should_work() {
 #[test]
 fn sell_should_work() {
 	run_test(|| {
-		let pool = create_default_pool();
-		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
+		let pool_params = create_default_pool_params();
+		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool_params));
 
 		// Add liquidity to pool
 		let pool_id = 0;
@@ -203,7 +210,7 @@ fn sell_should_work() {
 		assert_eq!(balance_1_pre_swap - amount_to_sell, Tokens::free_balance(ASSET_1, &ALICE));
 
 		// Expect to receive roughly `amount_to_sell` - fee tokens of token_b
-		let amount_to_receive: u128 = amount_to_sell - pool.fee.mul_ceil(amount_to_sell);
+		let amount_to_receive: u128 = amount_to_sell - pool_params.fee.mul_ceil(amount_to_sell);
 		assert_ok!(assert_with_computation_error(
 			balance_2_pre_swap + amount_to_receive,
 			Tokens::free_balance(ASSET_2, &ALICE),
@@ -214,7 +221,7 @@ fn sell_should_work() {
 			matches!(e.event,
             mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
             if who == ALICE && pool_id == pool_id && amount_b == amount_to_sell &&
-			token_a == ASSET_2 && token_b == ASSET_1 && fee == pool.fee)
+			token_a == ASSET_2 && token_b == ASSET_1 && fee == pool_params.fee)
 		});
 	});
 }
@@ -222,8 +229,8 @@ fn sell_should_work() {
 #[test]
 fn buy_should_work() {
 	run_test(|| {
-		let pool = create_default_pool();
-		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
+		let pool_params = create_default_pool_params();
+		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool_params));
 
 		// Add liquidity to pool
 		let pool_id = 0;
@@ -242,7 +249,7 @@ fn buy_should_work() {
 		assert_eq!(balance_1_pre_swap + amount_to_receive, Tokens::free_balance(ASSET_1, &ALICE));
 
 		// Expect to spend roughly `amount_to_sell` + fee tokens of token_b
-		let amount_to_sell: u128 = amount_to_receive + pool.fee.mul_ceil(amount_to_receive);
+		let amount_to_sell: u128 = amount_to_receive + pool_params.fee.mul_ceil(amount_to_receive);
 		assert_ok!(assert_with_computation_error(
 			balance_2_pre_swap - amount_to_sell,
 			Tokens::free_balance(ASSET_2, &ALICE),
@@ -253,7 +260,7 @@ fn buy_should_work() {
 			matches!(e.event,
             mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
             if who == ALICE && pool_id == pool_id && amount_a == amount_to_receive &&
-			token_a == ASSET_1 && token_b == ASSET_2 && fee == pool.fee)
+			token_a == ASSET_1 && token_b == ASSET_2 && fee == pool_params.fee)
 		});
 	});
 }

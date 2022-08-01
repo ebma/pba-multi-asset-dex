@@ -5,6 +5,7 @@ use frame_support::{
 };
 use frame_system as system;
 use orml_traits::parameter_type_with_key;
+use primitives::{CurrencyId, TokenSymbol};
 pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
 use sp_arithmetic::{FixedI128, FixedU128, Permill};
 use sp_core::H256;
@@ -62,7 +63,7 @@ impl system::Config for Test {
 }
 
 pub type AccountId = u64;
-pub type AssetId = u64;
+pub type AssetId = CurrencyId;
 pub type Balance = u128;
 pub type BlockNumber = u64;
 pub type PoolId = u128;
@@ -70,7 +71,7 @@ pub type Moment = u64;
 pub type Index = u64;
 
 parameter_types! {
-	pub const GetNativeCurrencyId: AssetId = 1;
+	pub const GetNativeCurrencyId: AssetId = CurrencyId::Native;
 	pub const MaxLocks: u32 = 50;
 	pub const DexPalletId: PalletId = PalletId(*b"dex_pall");
 }
@@ -83,6 +84,7 @@ impl pallet_dex::Config for Test {
 	type PalletId = DexPalletId;
 	type Assets = Tokens;
 	type Convert = ConvertInto;
+	type LiquidityTokenConversion = primitives::token_conversion::CurrencyConversion;
 }
 
 impl pallet_balances::Config for Test {
@@ -133,9 +135,9 @@ pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
 pub const DARWIN: AccountId = 4;
 
-pub const ASSET_1: AssetId = 1;
-pub const ASSET_2: AssetId = 2;
-pub const ASSET_3: AssetId = 3;
+pub const ASSET_1: AssetId = CurrencyId::Token(TokenSymbol::Short([0; 4]));
+pub const ASSET_2: AssetId = CurrencyId::Token(TokenSymbol::Short([1; 4]));
+// pub const ASSET_1: AssetId = CurrencyId::Token(TokenSymbol::Short([0x00, 0x01, 0x02, 0x03]));
 
 pub const BALANCES: [(AccountId, Balance); 4] =
 	[(ALICE, 1000), (BOB, 1000), (CHARLIE, 1000), (DARWIN, 1000)];

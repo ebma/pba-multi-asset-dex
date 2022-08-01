@@ -13,6 +13,8 @@ use sp_runtime::{
 };
 use sp_std::{convert::TryInto, prelude::*};
 
+pub mod token_conversion;
+
 pub trait BalanceToFixedPoint<FixedPoint> {
 	fn to_fixed(self) -> Option<FixedPoint>;
 }
@@ -122,10 +124,12 @@ pub trait CurrencyInfo {
 )]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum TokenSymbol {
-	USDC,
-	EURT,
-	WBTC,
+	Short(ShortSymbol),
+	Long(LongSymbol),
 }
+
+pub type ShortSymbol = [u8; 4];
+pub type LongSymbol = [u8; 8];
 
 #[derive(
 	Encode,
