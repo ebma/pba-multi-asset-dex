@@ -325,29 +325,6 @@ pub mod pallet {
 			let result = numerator.saturating_div(denominator);
 			Ok(result)
 		}
-
-		#[transactional]
-		fn distribute_fees(
-			who: &AccountIdOf<T>,
-			pool_id: &PoolIdOf<T>,
-			fee: Permill,
-		) -> Result<(), DispatchError> {
-			// if !fee.is_zero() {
-			// 	let staking_reward_pools = StakingRewardPools::<T>::get(&pool_id)
-			// 		.ok_or(Error::<T>::StakingPoolConfigError)?;
-			// 	for staking_reward_pool in staking_reward_pools {
-			// 		if staking_reward_pool.pool_type == RewardPoolType::PBLO {
-			// 			T::ProtocolStaking::transfer_reward(
-			// 				who,
-			// 				&staking_reward_pool.pool_id,
-			// 				fees.asset_id,
-			// 				fees.protocol_fee,
-			// 			)?;
-			// 		}
-			// 	}
-			// }
-			Ok(())
-		}
 	}
 
 	impl<T: Config> Amm for Pallet<T> {
@@ -597,7 +574,6 @@ pub mod pallet {
 			T::Assets::transfer(pair.token_b, who, &pool_account, amount_b)?;
 			T::Assets::transfer(pair.token_a, &pool_account, who, amount_a)?;
 
-			Self::distribute_fees(who, &pool_id, pool.fee)?;
 			Self::deposit_event(Event::<T>::Swapped {
 				pool_id,
 				who: who.clone(),
