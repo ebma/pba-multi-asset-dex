@@ -151,14 +151,20 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 pub fn new_test_ext_multi_currency() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
 
-	let balances: Vec<(AccountId, AssetId, Balance)> =
-		vec![(ALICE, ASSET_1, 1000), (ALICE, ASSET_2, 1000), (BOB, ASSET_1, 1000)];
+	let base_balance = 1_000_000;
+
+	let balances: Vec<(AccountId, AssetId, Balance)> = vec![
+		(ALICE, ASSET_1, base_balance),
+		(ALICE, ASSET_2, base_balance),
+		(BOB, ASSET_1, base_balance),
+	];
 
 	orml_tokens::GenesisConfig::<Test> { balances }
 		.assimilate_storage(&mut t)
 		.unwrap();
 
 	let mut ext = sp_io::TestExternalities::new(t);
+	// set block number to 1 to make sure that events are populated
 	ext.execute_with(|| System::set_block_number(1));
 	ext
 }

@@ -171,6 +171,7 @@ pub mod pallet {
 		InvalidAsset,
 		InsufficientBalance,
 		InsufficientInputAmount,
+		InsufficientOutputAmount,
 		InsufficientLiquidity,
 		InsufficientLiquidityBalance,
 		InvalidExchangeValue,
@@ -240,6 +241,19 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		pub fn buy(
+			origin: OriginFor<T>,
+			pool_id: PoolIdOf<T>,
+			asset_id: AssetIdOf<T>,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			<Self as Amm>::buy(&who, pool_id, asset_id, amount)?;
+			Ok(())
+		}
+
+		#[pallet::weight(10_000)]
 		pub fn sell(
 			origin: OriginFor<T>,
 			pool_id: PoolIdOf<T>,
@@ -275,21 +289,43 @@ pub mod pallet {
 			Ok(pool_id)
 		}
 
+		pub fn get_amount_in(
+			amount_out: u128,
+			reserve_in: u128,
+			reserve_out: u128,
+			fee: Permill,
+		) -> Result<u128, Error<T>> {
+			ensure!(amount_out > 0, Error::<T>::InsufficientOutputAmount);
+			ensure!(reserve_in > 0 && reserve_out > 0, Error::<T>::InsufficientLiquidity);
+
+			let multiplier: u128 = 1000;
+			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(1000));
+
+			let numerator = reserve_in.saturating_mul(amount_out).saturating_mul(multiplier);
+			let denominator = fee_multiplier.saturating_mul(reserve_out.saturating_sub(amount_out));
+
+			Ok(numerator.checked_div(denominator).map(|res| res.saturating_add(1)).unwrap_or(0))
+		}
+
 		fn get_amount_out(
 			amount_in: u128,
 			reserve_in: u128,
 			reserve_out: u128,
+			fee: Permill,
 		) -> Result<u128, DispatchError> {
-			if !(amount_in > 0) {
-				return Err(Error::<T>::InsufficientInputAmount.into())
-			}
-			if !(reserve_in > 0 && reserve_out > 0) {
-				return Err(Error::<T>::InsufficientLiquidity.into())
-			}
-			let amount_in_with_fee = amount_in.saturating_mul(997);
+			ensure!(amount_in > 0, Error::<T>::InsufficientInputAmount);
+			ensure!(reserve_in > 0 && reserve_out > 0, Error::<T>::InsufficientLiquidity);
+
+			let multiplier: u128 = 1000;
+			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(1000));
+
+			// Subtract fee from amount_in
+			let amount_in_with_fee = amount_in.saturating_mul(fee_multiplier);
 			let numerator = amount_in_with_fee.saturating_mul(reserve_out);
-			let denominator = reserve_in.saturating_mul(1000).saturating_add(amount_in_with_fee);
-			Ok(numerator.saturating_div(denominator))
+			let denominator =
+				reserve_in.saturating_mul(multiplier).saturating_add(amount_in_with_fee);
+			let result = numerator.saturating_div(denominator);
+			Ok(result)
 		}
 
 		#[transactional]
@@ -361,8 +397,7 @@ pub mod pallet {
 			let pool = Self::get_pool(pool_id)?;
 			let pool_account = Self::account_id(&pool_id);
 			let pair = pool.pair;
-			let reserve_a = (T::Assets::free_balance(pair.token_a, &pool_account));
-			let reserve_b = (T::Assets::free_balance(pair.token_b, &pool_account));
+			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
 
 			let quote = if pair.token_a == asset_id {
 				amount.checked_mul(&reserve_b).and_then(|x| x.checked_div(&reserve_a))
@@ -371,10 +406,11 @@ pub mod pallet {
 			} else {
 				return Err(Error::<T>::InvalidAsset.into())
 			};
-			match quote {
-				Some(x) => Ok(x),
-				None => Err(Error::<T>::InvalidAmount.into()),
-			}
+			quote.ok_or(Error::<T>::InvalidAmount.into())
+			// match quote {
+			// 	Some(x) => Ok(x),
+			// 	None => Err(Error::<T>::InvalidAmount.into()),
+			// }
 		}
 
 		#[transactional]
@@ -384,8 +420,21 @@ pub mod pallet {
 			asset_id: Self::AssetId,
 			amount: Self::Balance,
 		) -> Result<Self::Balance, DispatchError> {
-			todo!();
-			Ok(Self::Balance::zero())
+			let pool = Self::get_pool(pool_id)?;
+			let pair = if asset_id == pool.pair.token_a { pool.pair } else { pool.pair.swap() };
+
+			// Compute how much user has to pay to buy the given amount of the given asset.
+			// let sell_amount = Self::get_exchange_value(pool_id, asset_id, amount)?;
+			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
+			let (reserve_a, reserve_b) =
+				(T::Convert::convert(reserve_a), T::Convert::convert(reserve_b));
+			let amount = T::Convert::convert(amount);
+
+			let sell_amount = Self::get_amount_in(amount, reserve_a, reserve_b, pool.fee)?;
+			let sell_amount = T::Convert::convert(sell_amount);
+			println!("sell_amount: {:?}", sell_amount);
+			println!("amount: {:?}", amount);
+			<Self as Amm>::swap(who, pool_id, pair, sell_amount)
 		}
 
 		#[transactional]
@@ -500,8 +549,10 @@ pub mod pallet {
 			ensure!(amount_a.is_some() && amount_b.is_some(), Error::<T>::InvalidAmount);
 
 			// Unwrap and convert to Balance
-			let (amount_a, amount_b) =
-				(T::Convert::convert(amount_a.unwrap()), T::Convert::convert(amount_b.unwrap()));
+			let (amount_a, amount_b) = (
+				T::Convert::convert(amount_a.expect("Checked to be Some; qed")),
+				T::Convert::convert(amount_b.expect("Checked to be Some; qed")),
+			);
 			let amount = T::Convert::convert(amount);
 
 			ensure!(!amount_a.is_zero() && !amount_b.is_zero(), Error::<T>::InvalidAmount);
@@ -545,7 +596,7 @@ pub mod pallet {
 			let (reserve_a, reserve_b) =
 				(T::Convert::convert(reserve_a), T::Convert::convert(reserve_b));
 
-			let amount_a = Self::get_amount_out(amount_b, reserve_b, reserve_a)?;
+			let amount_a = Self::get_amount_out(amount_b, reserve_b, reserve_a, pool.fee)?;
 			ensure!(amount_a > 0, Error::<T>::InvalidAmount);
 
 			// Convert back to balances
