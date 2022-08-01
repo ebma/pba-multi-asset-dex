@@ -3,13 +3,15 @@
 use codec::{EncodeLike, FullCodec};
 use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
 use num_integer::{sqrt, Roots};
-use orml_traits::{arithmetic::CheckedAdd, MultiCurrency, MultiReservableCurrency};
+use orml_traits::{MultiCurrency, MultiReservableCurrency};
 pub use pallet::*;
 use primitives::TruncateFixedPointToInt;
 use scale_info::TypeInfo;
+use sp_arithmetic::{PerThing, Permill, UpperOf};
 use sp_runtime::{
 	traits::{
-		AccountIdConversion, AtLeast32BitUnsigned, CheckedDiv, MaybeSerializeDeserialize, One, Zero,
+		AccountIdConversion, AtLeast32BitUnsigned, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub,
+		Convert, MaybeSerializeDeserialize, One, Saturating, StaticLookup, Zero,
 	},
 	ArithmeticError, FixedPointNumber, FixedPointOperand,
 };
@@ -34,10 +36,6 @@ mod tests;
 pub mod pallet {
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
-	use sp_arithmetic::{PerThing, Permill, UpperOf};
-	use sp_runtime::traits::{
-		CheckedAdd, CheckedMul, CheckedSub, Convert, Saturating, StaticLookup,
-	};
 
 	use crate::traits::{Amm, CurrencyPair, Pool, PoolCreationParams};
 
