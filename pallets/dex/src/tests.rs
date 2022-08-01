@@ -1,8 +1,9 @@
 use frame_support::{assert_noop, assert_ok};
 use frame_system::{Config, EventRecord};
 use orml_traits::MultiCurrency;
+use sp_arithmetic::FixedPointNumber;
 use sp_core::H256;
-use sp_runtime::Permill;
+use sp_runtime::{FixedU128, Permill};
 
 use primitives::TokenSymbol;
 
@@ -42,6 +43,20 @@ fn create_default_pool() -> PoolOf<Test> {
 	let fee = Permill::from_percent(3);
 
 	Pool { owner, pair, lp_token, fee }
+}
+
+/// Default value for deviation of computation error
+const DEFAULT_EPSILON: u128 = 5;
+
+fn assert_with_computation_error(expected: u128, value: u128, epsilon: u128) -> Result<(), ()> {
+	let lower = expected.saturating_sub(epsilon);
+	let upper = expected.saturating_add(epsilon);
+
+	if lower <= value && value <= upper {
+		Ok(())
+	} else {
+		Err(())
+	}
 }
 
 #[test]
@@ -220,17 +235,21 @@ fn sell_should_work() {
 		let amount_to_sell = 100;
 		assert_ok!(Dex::sell(Origin::signed(ALICE), pool_id, asset, amount_to_sell));
 
-		// Expect to spend 10 tokens of token_a
+		// Expect to spend `amount_to_sell` tokens of token_a
 		assert_eq!(balance_1_pre_swap - amount_to_sell, Tokens::free_balance(ASSET_1, &ALICE));
 
-		// Expect to receive 9 tokens of token_b
-		let amount_to_receive = 90;
-		assert_eq!(balance_2_pre_swap + amount_to_receive, Tokens::free_balance(ASSET_2, &ALICE));
+		// Expect to receive roughly `amount_to_sell` - fee tokens of token_b
+		let amount_to_receive: u128 = amount_to_sell - pool.fee.mul_ceil(amount_to_sell);
+		assert_ok!(assert_with_computation_error(
+			balance_2_pre_swap + amount_to_receive,
+			Tokens::free_balance(ASSET_2, &ALICE),
+			DEFAULT_EPSILON,
+		));
 
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
             mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
-            if who == ALICE && pool_id == pool_id && amount_a == amount_to_receive && amount_b == amount_to_sell &&
+            if who == ALICE && pool_id == pool_id && amount_b == amount_to_sell &&
 			token_a == ASSET_2 && token_b == ASSET_1 && fee == pool.fee)
 		});
 	});
@@ -244,7 +263,7 @@ fn buy_should_work() {
 
 		// Add liquidity to pool
 		let pool_id = 0;
-		let amount = 100;
+		let amount = 100_000;
 		let asset = ASSET_1;
 		assert_ok!(Dex::add_liquidity(Origin::signed(ALICE), pool_id, amount, asset));
 
@@ -252,21 +271,25 @@ fn buy_should_work() {
 		let balance_2_pre_swap = Tokens::free_balance(ASSET_2, &ALICE);
 
 		let asset = ASSET_1;
-		let amount_to_receive = 10;
+		let amount_to_receive = 100;
 		assert_ok!(Dex::buy(Origin::signed(ALICE), pool_id, asset, amount_to_receive));
 
-		// Expect to spend 10 tokens of token_a
+		// Expect to receive `amount_to_receive` tokens of token_a
 		assert_eq!(balance_1_pre_swap + amount_to_receive, Tokens::free_balance(ASSET_1, &ALICE));
 
-		// Expect to receive 9 tokens of token_b
-		let amount_to_sell = 9;
-		assert_eq!(balance_2_pre_swap - amount_to_sell, Tokens::free_balance(ASSET_2, &ALICE));
+		// Expect to spend roughly `amount_to_sell` + fee tokens of token_b
+		let amount_to_sell: u128 = amount_to_receive + pool.fee.mul_ceil(amount_to_receive);
+		assert_ok!(assert_with_computation_error(
+			balance_2_pre_swap - amount_to_sell,
+			Tokens::free_balance(ASSET_2, &ALICE),
+			DEFAULT_EPSILON
+		));
 
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
             mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
-            if who == ALICE && pool_id == pool_id && amount_a == amount_to_receive && amount_b == amount_to_sell &&
-			token_a == ASSET_2 && token_b == ASSET_1 && fee == pool.fee)
+            if who == ALICE && pool_id == pool_id && amount_a == amount_to_receive &&
+			token_a == ASSET_1 && token_b == ASSET_2 && fee == pool.fee)
 		});
 	});
 }

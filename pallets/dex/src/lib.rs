@@ -42,10 +42,7 @@ pub mod pallet {
 	use sp_arithmetic::{PerThing, Permill, UpperOf};
 	use sp_runtime::traits::{CheckedAdd, CheckedMul, CheckedSub, Convert, Saturating};
 
-	use crate::{
-		mock::Balance,
-		traits::{Amm, CurrencyPair, Pool},
-	};
+	use crate::traits::{Amm, CurrencyPair, Pool};
 
 	use super::*;
 
@@ -299,12 +296,14 @@ pub mod pallet {
 			ensure!(reserve_in > 0 && reserve_out > 0, Error::<T>::InsufficientLiquidity);
 
 			let multiplier: u128 = 1000;
-			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(1000));
+			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(100));
 
 			let numerator = reserve_in.saturating_mul(amount_out).saturating_mul(multiplier);
 			let denominator = fee_multiplier.saturating_mul(reserve_out.saturating_sub(amount_out));
+			let result =
+				numerator.checked_div(denominator).and_then(|x| x.checked_add(1)).unwrap_or(0);
 
-			Ok(numerator.checked_div(denominator).map(|res| res.saturating_add(1)).unwrap_or(0))
+			Ok(result)
 		}
 
 		fn get_amount_out(
@@ -317,7 +316,7 @@ pub mod pallet {
 			ensure!(reserve_in > 0 && reserve_out > 0, Error::<T>::InsufficientLiquidity);
 
 			let multiplier: u128 = 1000;
-			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(1000));
+			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(100));
 
 			// Subtract fee from amount_in
 			let amount_in_with_fee = amount_in.saturating_mul(fee_multiplier);
@@ -407,10 +406,6 @@ pub mod pallet {
 				return Err(Error::<T>::InvalidAsset.into())
 			};
 			quote.ok_or(Error::<T>::InvalidAmount.into())
-			// match quote {
-			// 	Some(x) => Ok(x),
-			// 	None => Err(Error::<T>::InvalidAmount.into()),
-			// }
 		}
 
 		#[transactional]
@@ -424,7 +419,6 @@ pub mod pallet {
 			let pair = if asset_id == pool.pair.token_a { pool.pair } else { pool.pair.swap() };
 
 			// Compute how much user has to pay to buy the given amount of the given asset.
-			// let sell_amount = Self::get_exchange_value(pool_id, asset_id, amount)?;
 			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
 			let (reserve_a, reserve_b) =
 				(T::Convert::convert(reserve_a), T::Convert::convert(reserve_b));
@@ -432,8 +426,6 @@ pub mod pallet {
 
 			let sell_amount = Self::get_amount_in(amount, reserve_a, reserve_b, pool.fee)?;
 			let sell_amount = T::Convert::convert(sell_amount);
-			println!("sell_amount: {:?}", sell_amount);
-			println!("amount: {:?}", amount);
 			<Self as Amm>::swap(who, pool_id, pair, sell_amount)
 		}
 
