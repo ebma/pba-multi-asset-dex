@@ -78,7 +78,6 @@ parameter_types! {
 impl pallet_dex::Config for Test {
 	type Event = Event;
 	type Balance = Balance;
-	type GetNativeCurrencyId = GetNativeCurrencyId;
 	type AssetId = AssetId;
 	type PoolId = PoolId;
 	type PalletId = DexPalletId;
