@@ -52,7 +52,7 @@ pub mod pallet {
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config:
-		frame_system::Config + orml_tokens::Config<Balance = BalanceOf<Self>>
+		frame_system::Config + orml_tokens::Config<Balance = BalanceOf<Self>> // TODO remove coupling
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
@@ -67,7 +67,7 @@ pub mod pallet {
 			+ Debug;
 
 		#[pallet::constant]
-		type GetNativeCurrencyId: Get<CurrencyId<Self>>;
+		type GetNativeCurrencyId: Get<CurrencyId<Self>>; // TODO remove
 
 		type AssetId: FullCodec
 			+ MaxEncodedLen
@@ -270,15 +270,6 @@ pub mod pallet {
 			T::PalletId::get().into_sub_account_truncating(pool_id)
 		}
 
-		pub(crate) fn get_exchange_value(
-			pool_id: PoolIdOf<T>,
-			asset_id: AssetIdOf<T>,
-			amount: BalanceOf<T>,
-		) -> Result<BalanceOf<T>, DispatchError> {
-			let exchange_value = <Self as Amm>::get_exchange_value(pool_id, asset_id, amount)?;
-			Ok(exchange_value)
-		}
-
 		fn _create_pool(pool: PoolOf<T>) -> Result<PoolIdOf<T>, DispatchError> {
 			let pool_id =
 				PoolCount::<T>::try_mutate(|pool_count| -> Result<T::PoolId, DispatchError> {
@@ -331,7 +322,7 @@ pub mod pallet {
 			let numerator = amount_in_with_fee.saturating_mul(reserve_out);
 			let denominator =
 				reserve_in.saturating_mul(multiplier).saturating_add(amount_in_with_fee);
-			let result = numerator.saturating_div(denominator);
+			let result = numerator.checked_div(denominator).unwrap_or(0);
 			Ok(result)
 		}
 	}
@@ -440,10 +431,12 @@ pub mod pallet {
 			let (amount_a, amount_b) = if reserve_a.is_zero() && reserve_b.is_zero() {
 				(amount, amount)
 			} else if pool.pair.token_a == asset {
-				let other_amount = Self::get_exchange_value(pool_id, pool.pair.token_b, amount)?;
+				let other_amount =
+					<Self as Amm>::get_exchange_value(pool_id, pool.pair.token_b, amount)?;
 				(amount, other_amount)
 			} else if pool.pair.token_b == asset {
-				let other_amount = Self::get_exchange_value(pool_id, pool.pair.token_a, amount)?;
+				let other_amount =
+					<Self as Amm>::get_exchange_value(pool_id, pool.pair.token_a, amount)?;
 				(other_amount, amount)
 			} else {
 				return Err(Error::<T>::InvalidAsset.into())
@@ -464,19 +457,22 @@ pub mod pallet {
 				(T::Convert::convert(amount_a), T::Convert::convert(amount_b));
 
 			let lp_total_issuance = T::Convert::convert(T::Assets::total_issuance(pool.lp_token));
-			let amount_of_lp_token_to_mint = if lp_total_issuance == 0 {
-				let product = amount_a.saturating_mul(amount_b);
-				sqrt(product)
-			} else {
-				core::cmp::min(
-					amount_a
-						.saturating_mul(lp_total_issuance)
-						.saturating_div(T::Convert::convert(reserve_a)),
-					amount_b
-						.saturating_mul(lp_total_issuance)
-						.saturating_div(T::Convert::convert(reserve_b)),
-				)
-			};
+			let amount_of_lp_token_to_mint =
+				if lp_total_issuance == 0 || (reserve_a.is_zero() && reserve_b.is_zero()) {
+					let product = amount_a.saturating_mul(amount_b);
+					sqrt(product)
+				} else {
+					core::cmp::min(
+						amount_a
+							.saturating_mul(lp_total_issuance)
+							.checked_div(T::Convert::convert(reserve_a))
+							.ok_or(ArithmeticError::DivisionByZero)?,
+						amount_b
+							.saturating_mul(lp_total_issuance)
+							.checked_div(T::Convert::convert(reserve_b))
+							.ok_or(ArithmeticError::DivisionByZero)?,
+					)
+				};
 
 			// Convert back to balances
 			let (amount_a, amount_b) =
