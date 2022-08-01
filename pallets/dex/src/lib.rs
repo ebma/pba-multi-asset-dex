@@ -262,12 +262,21 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		pub(crate) fn get_pool(pool_id: T::PoolId) -> Result<PoolOf<T>, DispatchError> {
+		pub(crate) fn get_pool(pool_id: PoolIdOf<T>) -> Result<PoolOf<T>, DispatchError> {
 			Pools::<T>::get(pool_id).ok_or_else(|| Error::<T>::PoolNotFound.into())
 		}
 
-		pub(crate) fn account_id(pool_id: &T::PoolId) -> T::AccountId {
+		pub(crate) fn account_id(pool_id: &PoolIdOf<T>) -> T::AccountId {
 			T::PalletId::get().into_sub_account_truncating(pool_id)
+		}
+
+		pub(crate) fn get_exchange_value(
+			pool_id: PoolIdOf<T>,
+			asset_id: AssetIdOf<T>,
+			amount: BalanceOf<T>,
+		) -> Result<BalanceOf<T>, DispatchError> {
+			let exchange_value = <Self as Amm>::get_exchange_value(pool_id, asset_id, amount)?;
+			Ok(exchange_value)
 		}
 
 		fn _create_pool(pool: PoolOf<T>) -> Result<PoolIdOf<T>, DispatchError> {
