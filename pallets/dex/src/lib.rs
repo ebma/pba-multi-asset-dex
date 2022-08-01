@@ -32,9 +32,6 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
-
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{pallet_prelude::*, PalletId};
@@ -286,6 +283,7 @@ pub mod pallet {
 			Ok(pool_id)
 		}
 
+		// Adapted from https://github.com/Uniswap/v2-periphery/blob/master/contracts/libraries/UniswapV2Library.sol
 		pub fn get_amount_in(
 			amount_out: u128,
 			reserve_in: u128,
@@ -296,7 +294,7 @@ pub mod pallet {
 			ensure!(reserve_in > 0 && reserve_out > 0, Error::<T>::InsufficientLiquidity);
 
 			let multiplier: u128 = 1000;
-			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(100));
+			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(1000));
 
 			let numerator = reserve_in.saturating_mul(amount_out).saturating_mul(multiplier);
 			let denominator = fee_multiplier.saturating_mul(reserve_out.saturating_sub(amount_out));
@@ -306,6 +304,7 @@ pub mod pallet {
 			Ok(result)
 		}
 
+		// Adapted from https://github.com/Uniswap/v2-periphery/blob/master/contracts/libraries/UniswapV2Library.sol
 		fn get_amount_out(
 			amount_in: u128,
 			reserve_in: u128,
@@ -316,7 +315,7 @@ pub mod pallet {
 			ensure!(reserve_in > 0 && reserve_out > 0, Error::<T>::InsufficientLiquidity);
 
 			let multiplier: u128 = 1000;
-			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(100));
+			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(1000));
 
 			// Subtract fee from amount_in
 			let amount_in_with_fee = amount_in.saturating_mul(fee_multiplier);
@@ -373,7 +372,7 @@ pub mod pallet {
 			Ok(pool.lp_token)
 		}
 
-		// Return the balances of the assets in the pool.
+		/// Return the balances of the assets in the pool.
 		fn pool_reserves(
 			pool_id: Self::PoolId,
 		) -> Result<(Self::Balance, Self::Balance), DispatchError> {
@@ -386,8 +385,8 @@ pub mod pallet {
 			Ok((reserve_a, reserve_b))
 		}
 
-		// Calculate the value of a given asset in a given pool based on the other asset in the
-		// currency pair.
+		/// Calculate the value of a given asset in a given pool based on the other asset in the
+		/// currency pair.
 		fn get_exchange_value(
 			pool_id: Self::PoolId,
 			asset_id: Self::AssetId,
@@ -566,9 +565,9 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// Execute a swap and return the amount of tokens received by executing the swap
-		// The order of assets in the CurrencyPair will decide how the swap is executed
-		// The user will spend `amount_b_in` tokens of token b to receive some tokens of token_a
+		/// Execute a swap and return the amount of tokens received by executing the swap
+		/// The order of assets in the CurrencyPair will decide how the swap is executed
+		/// The user will spend `amount_b_in` tokens of token b to receive some tokens of token_a
 		#[transactional]
 		fn swap(
 			who: &Self::AccountId,
