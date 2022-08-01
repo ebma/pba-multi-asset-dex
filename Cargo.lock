@@ -1186,9 +1186,10 @@ dependencies = [
 
 [[package]]
 name = "dex-primitives"
-version = "1.2.0"
+version = "1.0.0"
 dependencies = [
  "bstringify",
+ "frame-support",
  "orml-currencies",
  "orml-tokens",
  "orml-traits",
@@ -4113,7 +4114,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-dex"
-version = "4.0.0-dev"
+version = "1.0.0"
 dependencies = [
  "dex-primitives",
  "frame-benchmarking",
@@ -4153,6 +4154,27 @@ dependencies = [
  "sp-runtime",
  "sp-session",
  "sp-staking",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-nft"
+version = "1.0.0"
+dependencies = [
+ "dex-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "orml-tokens",
+ "orml-traits",
+ "pallet-balances",
+ "pallet-randomness-collective-flip",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
  "sp-std",
 ]
 

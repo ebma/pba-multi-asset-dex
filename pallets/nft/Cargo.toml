@@ -27,6 +27,12 @@ sp-core = { default-features = false, git = 'https://github.com/paritytech/subst
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
 
+# Orml dependencies
+orml-tokens = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "polkadot-v0.9.26", default-features = false }
+orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "polkadot-v0.9.26", default-features = false }
+
+primitives = { package = "dex-primitives", path = "../../primitives", default-features = false }
+
 [features]
 default = ['std']
 std = [
@@ -40,6 +46,10 @@ std = [
     'serde/std',
     'sp-core/std',
     'sp-std/std',
+
+    "orml-tokens/std",
+    "orml-traits/std",
+    "primitives/std",
 ]
 runtime-benchmarks = [
     'frame-benchmarking',

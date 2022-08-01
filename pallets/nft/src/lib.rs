@@ -1,17 +1,21 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{EncodeLike, FullCodec};
+use orml_traits::MultiCurrency;
 pub use pallet::*;
 use scale_info::TypeInfo;
 use sp_io::hashing::blake2_128;
-use sp_runtime::ArithmeticError;
-use sp_std::convert::TryInto;
+use sp_runtime::{traits::AtLeast32BitUnsigned, ArithmeticError, FixedPointOperand};
+use sp_std::{convert::TryInto, fmt::Debug};
 
 #[cfg(test)]
 pub mod mock;
 
 #[cfg(test)]
 mod tests;
+
+mod types;
+use types::*;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -26,10 +30,6 @@ pub mod pallet {
 	#[cfg(feature = "std")]
 	use frame_support::serde::{Deserialize, Serialize};
 
-	// Handles our pallet's currency abstraction
-	type BalanceOf<T> =
-		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-
 	// Struct for holding kitty information
 	#[derive(Clone, Encode, Decode, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
@@ -37,7 +37,7 @@ pub mod pallet {
 		// Using 16 bytes to represent a kitty DNA
 		pub dna: [u8; 16],
 		// `None` assumes not for sale
-		pub price: Option<BalanceOf<T>>,
+		pub price: Option<PriceOf<T>>,
 		pub gender: Gender,
 		pub owner: T::AccountId,
 	}
@@ -61,8 +61,34 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
+		type Balance: AtLeast32BitUnsigned
+			+ FixedPointOperand
+			+ MaybeSerializeDeserialize
+			+ FullCodec
+			+ Copy
+			+ Default
+			+ TypeInfo
+			+ MaxEncodedLen
+			+ Debug;
+
+		type AssetId: FullCodec
+			+ MaxEncodedLen
+			+ Eq
+			+ PartialEq
+			+ Copy
+			+ Clone
+			+ MaybeSerializeDeserialize
+			+ Debug
+			+ Default
+			+ TypeInfo
+			+ Ord;
+
 		/// The Currency handler for the kitties pallet.
-		type Currency: Currency<Self::AccountId>;
+		type Assets: MultiCurrency<
+			Self::AccountId,
+			Balance = BalanceOf<Self>,
+			CurrencyId = Self::AssetId,
+		>;
 
 		/// The maximum amount of kitties a single account can own.
 		#[pallet::constant]
@@ -100,11 +126,11 @@ pub mod pallet {
 		/// A new kitty was successfully created.
 		Created { kitty: [u8; 16], owner: T::AccountId },
 		/// The price of a kitty was successfully set.
-		PriceSet { kitty: [u8; 16], price: Option<BalanceOf<T>> },
+		PriceSet { kitty: [u8; 16], price: Option<PriceOf<T>> },
 		/// A kitty was successfully transferred.
 		Transferred { from: T::AccountId, to: T::AccountId, kitty: [u8; 16] },
 		/// A kitty was successfully sold.
-		Sold { seller: T::AccountId, buyer: T::AccountId, kitty: [u8; 16], price: BalanceOf<T> },
+		Sold { seller: T::AccountId, buyer: T::AccountId, kitty: [u8; 16], price: PriceOf<T> },
 	}
 
 	/// Keeps track of the number of kitties in existence.
@@ -230,7 +256,7 @@ pub mod pallet {
 		pub fn buy_kitty(
 			origin: OriginFor<T>,
 			kitty_id: [u8; 16],
-			limit_price: BalanceOf<T>,
+			limit_price: PriceOf<T>,
 		) -> DispatchResult {
 			// Make sure the caller is from a signed origin
 			let buyer = ensure_signed(origin)?;
@@ -247,7 +273,7 @@ pub mod pallet {
 		pub fn set_price(
 			origin: OriginFor<T>,
 			kitty_id: [u8; 16],
-			new_price: Option<BalanceOf<T>>,
+			new_price: Option<PriceOf<T>>,
 		) -> DispatchResult {
 			// Make sure the caller is from a signed origin
 			let sender = ensure_signed(origin)?;
@@ -360,7 +386,7 @@ pub mod pallet {
 		pub fn do_transfer(
 			kitty_id: [u8; 16],
 			to: T::AccountId,
-			maybe_limit_price: Option<BalanceOf<T>>,
+			maybe_limit_price: Option<PriceOf<T>>,
 		) -> DispatchResult {
 			// Get the kitty
 			let mut kitty = Kitties::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
@@ -385,16 +411,16 @@ pub mod pallet {
 			// a protection so the seller isn't able to front-run the transaction.
 			if let Some(limit_price) = maybe_limit_price {
 				// Current kitty price if for sale
-				if let Some(price) = kitty.price {
-					ensure!(limit_price >= price, Error::<T>::BidPriceTooLow);
+				if let Some((price, asset)) = kitty.price {
+					ensure!(limit_price.0 >= price, Error::<T>::BidPriceTooLow);
 					// Transfer the amount from buyer to seller
-					T::Currency::transfer(&to, &from, price, ExistenceRequirement::KeepAlive)?;
+					T::Assets::transfer(asset, &to, &from, price)?;
 					// Deposit sold event
 					Self::deposit_event(Event::Sold {
 						seller: from.clone(),
 						buyer: to.clone(),
 						kitty: kitty_id,
-						price,
+						price: (price, asset),
 					});
 				} else {
 					// Kitty price is set to `None` and is not for sale
