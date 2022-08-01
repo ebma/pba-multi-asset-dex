@@ -1,8 +1,14 @@
 use frame_support::dispatch::DispatchError;
 use sp_runtime::FixedPointNumber;
 
-use crate::Config;
-
-pub type CurrencyId<T> = <T as orml_tokens::Config>::CurrencyId;
+use crate::{
+	traits::{Pool, PoolCreationParams},
+	Config,
+};
 
 pub(crate) type BalanceOf<T> = <T as Config>::Balance;
+pub(crate) type AssetIdOf<T> = <T as Config>::AssetId;
+pub(crate) type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+pub(crate) type PoolOf<T> = Pool<AccountIdOf<T>, AssetIdOf<T>>;
+pub(crate) type PoolCreationParamsOf<T> = PoolCreationParams<AccountIdOf<T>, AssetIdOf<T>>;
+pub(crate) type PoolIdOf<T> = <T as Config>::PoolId;

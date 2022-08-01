@@ -4,6 +4,8 @@ use codec::{EncodeLike, FullCodec};
 use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
 use num_integer::{sqrt, Roots};
 use orml_traits::{arithmetic::CheckedAdd, MultiCurrency, MultiReservableCurrency};
+pub use pallet::*;
+use primitives::TruncateFixedPointToInt;
 use scale_info::TypeInfo;
 use sp_runtime::{
 	traits::{
@@ -16,10 +18,6 @@ use sp_std::{
 	fmt::Debug,
 	marker::PhantomData,
 };
-
-pub use pallet::*;
-use primitives::TruncateFixedPointToInt;
-pub use types::CurrencyId;
 use types::*;
 
 mod calc;
@@ -44,13 +42,6 @@ pub mod pallet {
 	use crate::traits::{Amm, CurrencyPair, Pool, PoolCreationParams};
 
 	use super::*;
-
-	pub(crate) type AssetIdOf<T> = <T as Config>::AssetId;
-	pub(crate) type BalanceOf<T> = <T as Config>::Balance;
-	pub(crate) type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
-	pub(crate) type PoolOf<T> = Pool<AccountIdOf<T>, AssetIdOf<T>>;
-	pub(crate) type PoolCreationParamsOf<T> = PoolCreationParams<AccountIdOf<T>, AssetIdOf<T>>;
-	pub(crate) type PoolIdOf<T> = <T as Config>::PoolId;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -101,6 +92,7 @@ pub mod pallet {
 			CurrencyId = Self::AssetId,
 		>;
 
+		/// Used to convert Balance to u128 in order to use it in the arithmetic.
 		type Convert: Convert<u128, BalanceOf<Self>> + Convert<BalanceOf<Self>, u128>;
 
 		/// This is used to derive the AssetId of the liquidity token.
@@ -304,49 +296,6 @@ pub mod pallet {
 				})?;
 			Ok(pool_id)
 		}
-
-		// Adapted from https://github.com/Uniswap/v2-periphery/blob/master/contracts/libraries/UniswapV2Library.sol
-		pub fn get_amount_in(
-			amount_out: u128,
-			reserve_in: u128,
-			reserve_out: u128,
-			fee: Permill,
-		) -> Result<u128, Error<T>> {
-			ensure!(amount_out > 0, Error::<T>::InsufficientOutputAmount);
-			ensure!(reserve_in > 0 && reserve_out > 0, Error::<T>::InsufficientLiquidity);
-
-			let multiplier: u128 = 1000;
-			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(1000));
-
-			let numerator = reserve_in.saturating_mul(amount_out).saturating_mul(multiplier);
-			let denominator = fee_multiplier.saturating_mul(reserve_out.saturating_sub(amount_out));
-			let result =
-				numerator.checked_div(denominator).and_then(|x| x.checked_add(1)).unwrap_or(0);
-
-			Ok(result)
-		}
-
-		// Adapted from https://github.com/Uniswap/v2-periphery/blob/master/contracts/libraries/UniswapV2Library.sol
-		fn get_amount_out(
-			amount_in: u128,
-			reserve_in: u128,
-			reserve_out: u128,
-			fee: Permill,
-		) -> Result<u128, DispatchError> {
-			ensure!(amount_in > 0, Error::<T>::InsufficientInputAmount);
-			ensure!(reserve_in > 0 && reserve_out > 0, Error::<T>::InsufficientLiquidity);
-
-			let multiplier: u128 = 1000;
-			let fee_multiplier: u128 = 1000u128.saturating_sub(fee.mul_floor(1000));
-
-			// Subtract fee from amount_in
-			let amount_in_with_fee = amount_in.saturating_mul(fee_multiplier);
-			let numerator = amount_in_with_fee.saturating_mul(reserve_out);
-			let denominator =
-				reserve_in.saturating_mul(multiplier).saturating_add(amount_in_with_fee);
-			let result = numerator.checked_div(denominator).unwrap_or(0);
-			Ok(result)
-		}
 	}
 
 	impl<T: Config> Amm for Pallet<T> {
@@ -422,7 +371,7 @@ pub mod pallet {
 				(T::Convert::convert(reserve_a), T::Convert::convert(reserve_b));
 			let amount = T::Convert::convert(amount);
 
-			let sell_amount = Self::get_amount_in(amount, reserve_a, reserve_b, pool.fee)?;
+			let sell_amount = calc::get_amount_in::<T>(amount, reserve_a, reserve_b, pool.fee)?;
 			let sell_amount = T::Convert::convert(sell_amount);
 			<Self as Amm>::swap(who, pool_id, pair, sell_amount)
 		}
@@ -591,7 +540,7 @@ pub mod pallet {
 			let (reserve_a, reserve_b) =
 				(T::Convert::convert(reserve_a), T::Convert::convert(reserve_b));
 
-			let amount_a = Self::get_amount_out(amount_b, reserve_b, reserve_a, pool.fee)?;
+			let amount_a = calc::get_amount_out::<T>(amount_b, reserve_b, reserve_a, pool.fee)?;
 			ensure!(amount_a > 0, Error::<T>::InvalidAmount);
 
 			// Convert back to balances
