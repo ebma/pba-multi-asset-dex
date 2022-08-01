@@ -2,7 +2,7 @@
 authors = ["Marcel Ebert"]
 edition = "2021"
 name = "dex-primitives"
-version = "1.2.0"
+version = "1.0.0"
 
 [dependencies]
 bstringify = "0.1.2"

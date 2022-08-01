@@ -6,6 +6,7 @@
 #[macro_use]
 extern crate frame_benchmarking;
 
+use frame_support::PalletId;
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -17,7 +18,6 @@ pub use frame_support::{
 	},
 	StorageValue,
 };
-use frame_support::PalletId;
 // A few exports that help ease life for downstream crates.
 use frame_support::traits::{AsEnsureOriginWithArg, Contains};
 pub use frame_system::Call as SystemCall;
@@ -37,13 +37,13 @@ pub use sp_runtime::BuildStorage;
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify, Zero,
+		AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto, IdentifyAccount, NumberFor,
+		Verify, Zero,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, MultiSignature,
 };
 pub use sp_runtime::{Perbill, Permill};
-use sp_runtime::traits::ConvertInto;
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -52,12 +52,12 @@ use sp_version::RuntimeVersion;
 pub mod constants;
 use constants::{currency::*, time::*};
 pub use pallet_dex;
-use primitives::{BasicCurrencyAdapter, PoolId};
 pub use primitives::{
 	self, AccountId, Amount, Balance, BlockNumber, CurrencyId, CurrencyId::Token, CurrencyInfo,
 	Hash, Index, Moment, Nonce, Signature, SignedFixedPoint, SignedInner, TokenSymbol,
 	UnsignedFixedPoint, UnsignedInner,
 };
+use primitives::{BasicCurrencyAdapter, PoolId};
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
@@ -306,7 +306,6 @@ parameter_types! {
 	pub const GetTokenId: CurrencyId = CurrencyId::Native;
 }
 
-
 impl pallet_uniques::Config for Runtime {
 	type Event = Event;
 	type CollectionId = u32;
@@ -326,7 +325,6 @@ impl pallet_uniques::Config for Runtime {
 	type WeightInfo = ();
 }
 
-
 parameter_types! {
 	pub const DexPalletId: PalletId = PalletId(*b"dex_pall");
 }
@@ -335,12 +333,12 @@ parameter_types! {
 impl pallet_dex::Config for Runtime {
 	type Event = Event;
 	type Balance = Balance;
-	type GetNativeCurrencyId = GetNativeCurrencyId;
 	type AssetId = CurrencyId;
 	type PoolId = PoolId;
 	type PalletId = DexPalletId;
 	type Assets = Tokens;
 	type Convert = ConvertInto;
+	type LiquidityTokenConversion = primitives::token_conversion::CurrencyConversion;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

@@ -57,7 +57,7 @@ orml-currencies = { git = "https://github.com/open-web3-stack/open-runtime-modul
 orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "polkadot-v0.9.26", default-features = false }
 
 # Local Dependencies
-pallet-dex = { version = "4.0.0-dev", default-features = false, path = "../pallets/dex" }
+pallet-dex = { default-features = false, path = "../pallets/dex" }
 primitives = { package = "dex-primitives", path = "../primitives", default-features = false }
 
 [build-dependencies]
