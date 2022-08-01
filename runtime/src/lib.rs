@@ -303,26 +303,17 @@ parameter_types! {
 }
 
 parameter_types! {
-	pub const GetTokenId: CurrencyId = CurrencyId::Native;
+	// One can own at most 9,999 Kitties
+	pub const MaxKittiesOwned: u32 = 9999;
 }
 
-impl pallet_uniques::Config for Runtime {
+impl pallet_nft::Config for Runtime {
 	type Event = Event;
-	type CollectionId = u32;
-	type ItemId = u32;
-	type Currency = orml_tokens::CurrencyAdapter<Runtime, GetTokenId>;
-	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
-	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
-	type Locker = (); // TODO change me
-	type CollectionDeposit = CollectionDeposit;
-	type ItemDeposit = ItemDeposit;
-	type MetadataDepositBase = UniquesMetadataDepositBase;
-	type AttributeDepositBase = AttributeDepositBase;
-	type DepositPerByte = DepositPerByte;
-	type StringLimit = UniquesStringLimit;
-	type KeyLimit = KeyLimit;
-	type ValueLimit = ValueLimit;
-	type WeightInfo = ();
+	type Balance = Balance;
+	type AssetId = CurrencyId;
+	type Assets = Tokens;
+	type MaxKittiesOwned = MaxKittiesOwned;
+	type KittyRandomness = RandomnessCollectiveFlip;
 }
 
 parameter_types! {
@@ -357,7 +348,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 
-		Uniques: pallet_uniques,
+		Nfts: pallet_nft,
 		Currencies: orml_currencies,
 		Tokens: orml_tokens,
 		// Include the custom logic from the pallet-dex in the runtime.

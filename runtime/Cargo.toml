@@ -39,9 +39,6 @@ sp-std = { version = "4.0.0-dev", default-features = false, git = "https://githu
 sp-transaction-pool = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
 sp-version = { version = "5.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
 
-# NFT pallet
-pallet-uniques = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26", optional = true }
-
 # Used for the node template's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
 pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
@@ -58,6 +55,7 @@ orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-li
 
 # Local Dependencies
 pallet-dex = { default-features = false, path = "../pallets/dex" }
+pallet-nft = { default-features = false, path = "../pallets/nft" }
 primitives = { package = "dex-primitives", path = "../primitives", default-features = false }
 
 [build-dependencies]
@@ -92,7 +90,7 @@ std = [
 	"sp-transaction-pool/std",
 	"sp-version/std",
 
-	"pallet-uniques/std",
+	"pallet-nft/std",
 	"pallet-dex/std",
 	"orml-tokens/std",
 	"orml-currencies/std",
