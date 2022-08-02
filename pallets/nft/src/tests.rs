@@ -7,7 +7,7 @@ use frame_support::{assert_noop, assert_ok};
 // This will panic if things are not correct.
 fn assert_ownership(owner: u64, kitty_id: [u8; 16]) {
 	// For a kitty to be owned it should exist.
-	let kitty = Kitties::<Test>::get(kitty_id).unwrap();
+	let kitty = UniqueItems::<Test>::get(kitty_id).unwrap();
 	// The kitty's owner is set correctly.
 	assert_eq!(kitty.owner, owner);
 

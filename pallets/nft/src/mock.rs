@@ -87,7 +87,7 @@ impl pallet_balances::Config for Test {
 }
 
 parameter_types! {
-	// One can owned at most 9,999 Kitties
+	// One can owned at most 9,999 UniqueItems
 	pub const MaxKittiesOwned: u32 = 9999;
 }
 
@@ -150,7 +150,7 @@ pub(crate) fn new_test_ext(users: Vec<(u64, [u8; 16], Gender)>) -> sp_io::TestEx
 				.collect(),
 		},
 		nfts: NftsConfig {
-			kitties: users.iter().map(|(user, kitty, gender)| (*user, *kitty, *gender)).collect(),
+			unique_items: users.iter().map(|(user, kitty, gender)| (*user, *kitty, *gender)).collect(),
 		},
 		..Default::default()
 	}

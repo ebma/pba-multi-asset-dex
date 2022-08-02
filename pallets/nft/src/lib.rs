@@ -14,8 +14,10 @@ pub mod mock;
 #[cfg(test)]
 mod tests;
 
+mod traits;
 mod types;
 use types::*;
+use traits::{Kitty, Gender};
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -26,30 +28,6 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 
 	use super::*;
-
-	#[cfg(feature = "std")]
-	use frame_support::serde::{Deserialize, Serialize};
-
-	// Struct for holding kitty information
-	#[derive(Clone, Encode, Decode, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-	#[scale_info(skip_type_params(T))]
-	pub struct Kitty<T: Config> {
-		// Using 16 bytes to represent a kitty DNA
-		pub dna: [u8; 16],
-		// `None` assumes not for sale
-		pub price: Option<PriceOf<T>>,
-		pub gender: Gender,
-		pub owner: T::AccountId,
-	}
-
-	// Set Gender type in kitty struct
-	#[derive(Clone, Encode, Decode, PartialEq, Copy, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-	// We need this to pass kitty info for genesis configuration
-	#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-	pub enum Gender {
-		Male,
-		Female,
-	}
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -83,14 +61,14 @@ pub mod pallet {
 			+ TypeInfo
 			+ Ord;
 
-		/// The Currency handler for the kitties pallet.
+		/// The Currency handler for the unique_items pallet.
 		type Assets: MultiCurrency<
 			Self::AccountId,
 			Balance = BalanceOf<Self>,
 			CurrencyId = Self::AssetId,
 		>;
 
-		/// The maximum amount of kitties a single account can own.
+		/// The maximum amount of unique_items a single account can own.
 		#[pallet::constant]
 		type MaxKittiesOwned: Get<u32>;
 
@@ -133,15 +111,15 @@ pub mod pallet {
 		Sold { seller: T::AccountId, buyer: T::AccountId, kitty: [u8; 16], price: PriceOf<T> },
 	}
 
-	/// Keeps track of the number of kitties in existence.
+	/// Keeps track of the number of unique_items in existence.
 	#[pallet::storage]
 	pub(super) type CountForKitties<T: Config> = StorageValue<_, u64, ValueQuery>;
 
 	/// Maps the kitty struct to the kitty DNA.
 	#[pallet::storage]
-	pub(super) type Kitties<T: Config> = StorageMap<_, Twox64Concat, [u8; 16], Kitty<T>>;
+	pub(super) type UniqueItems<T: Config> = StorageMap<_, Twox64Concat, [u8; 16], Kitty<T>>;
 
-	/// Track the kitties owned by each account.
+	/// Track the unique_items owned by each account.
 	#[pallet::storage]
 	pub(super) type KittiesOwned<T: Config> = StorageMap<
 		_,
@@ -154,14 +132,14 @@ pub mod pallet {
 	// Our pallet's genesis configuration
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
-		pub kitties: Vec<(T::AccountId, [u8; 16], Gender)>,
+		pub unique_items: Vec<(T::AccountId, [u8; 16], Gender)>,
 	}
 
 	// Required to implement default for GenesisConfig
 	#[cfg(feature = "std")]
 	impl<T: Config> Default for GenesisConfig<T> {
 		fn default() -> GenesisConfig<T> {
-			GenesisConfig { kitties: vec![] }
+			GenesisConfig { unique_items: vec![] }
 		}
 	}
 
@@ -170,7 +148,7 @@ pub mod pallet {
 		fn build(&self) {
 			// When building a kitty from genesis config, we require the DNA and Gender to be
 			// supplied
-			for (account, dna, gender) in &self.kitties {
+			for (account, dna, gender) in &self.unique_items {
 				assert!(Pallet::<T>::mint(account, *dna, *gender).is_ok());
 			}
 		}
@@ -208,8 +186,8 @@ pub mod pallet {
 			let sender = ensure_signed(origin)?;
 
 			// Get the kitties.
-			let maybe_mom = Kitties::<T>::get(&parent_1).ok_or(Error::<T>::NoKitty)?;
-			let maybe_dad = Kitties::<T>::get(&parent_2).ok_or(Error::<T>::NoKitty)?;
+			let maybe_mom = UniqueItems::<T>::get(&parent_1).ok_or(Error::<T>::NoKitty)?;
+			let maybe_dad = UniqueItems::<T>::get(&parent_2).ok_or(Error::<T>::NoKitty)?;
 
 			// Check both parents are owned by the caller of this function
 			ensure!(maybe_mom.owner == sender, Error::<T>::NotOwner);
@@ -238,7 +216,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			// Make sure the caller is from a signed origin
 			let from = ensure_signed(origin)?;
-			let kitty = Kitties::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
+			let kitty = UniqueItems::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
 			ensure!(kitty.owner == from, Error::<T>::NotOwner);
 			Self::do_transfer(kitty_id, to, None)?;
 			Ok(())
@@ -279,12 +257,12 @@ pub mod pallet {
 			let sender = ensure_signed(origin)?;
 
 			// Ensure the kitty exists and is called by the kitty owner
-			let mut kitty = Kitties::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
+			let mut kitty = UniqueItems::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
 			ensure!(kitty.owner == sender, Error::<T>::NotOwner);
 
 			// Set the price in storage
 			kitty.price = new_price;
-			Kitties::<T>::insert(&kitty_id, kitty);
+			UniqueItems::<T>::insert(&kitty_id, kitty);
 
 			// Deposit a "PriceSet" event.
 			Self::deposit_event(Event::PriceSet { kitty: kitty_id, price: new_price });
@@ -361,7 +339,7 @@ pub mod pallet {
 			let kitty = Kitty::<T> { dna, price: None, gender, owner: owner.clone() };
 
 			// Check if the kitty does not already exist in our storage map
-			ensure!(!Kitties::<T>::contains_key(&kitty.dna), Error::<T>::DuplicateKitty);
+			ensure!(!UniqueItems::<T>::contains_key(&kitty.dna), Error::<T>::DuplicateKitty);
 
 			// Performs this operation first as it may fail
 			let count = CountForKitties::<T>::get();
@@ -372,7 +350,7 @@ pub mod pallet {
 				.map_err(|_| Error::<T>::TooManyOwned)?;
 
 			// Write new kitty to storage
-			Kitties::<T>::insert(kitty.dna, kitty);
+			UniqueItems::<T>::insert(kitty.dna, kitty);
 			CountForKitties::<T>::put(new_count);
 
 			// Deposit our "Created" event.
@@ -389,7 +367,7 @@ pub mod pallet {
 			maybe_limit_price: Option<PriceOf<T>>,
 		) -> DispatchResult {
 			// Get the kitty
-			let mut kitty = Kitties::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
+			let mut kitty = UniqueItems::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
 			let from = kitty.owner;
 
 			ensure!(from != to, Error::<T>::TransferToSelf);
@@ -433,7 +411,7 @@ pub mod pallet {
 			kitty.price = None;
 
 			// Write updates to storage
-			Kitties::<T>::insert(&kitty_id, kitty);
+			UniqueItems::<T>::insert(&kitty_id, kitty);
 			KittiesOwned::<T>::insert(&to, to_owned);
 			KittiesOwned::<T>::insert(&from, from_owned);
 
