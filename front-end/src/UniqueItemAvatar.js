@@ -6,19 +6,19 @@ const genArray = (start, end) =>
 
 const IMAGES = {
   accessory: genArray(1, 20).map(
-    n => `${process.env.PUBLIC_URL}/assets/KittyAvatar/accessorie_${n}.png`
+    n => `${process.env.PUBLIC_URL}/assets/UniqueItemAvatar/accessorie_${n}.png`
   ),
   body: genArray(1, 15).map(
-    n => `${process.env.PUBLIC_URL}/assets/KittyAvatar/body_${n}.png`
+    n => `${process.env.PUBLIC_URL}/assets/UniqueItemAvatar/body_${n}.png`
   ),
   eyes: genArray(1, 15).map(
-    n => `${process.env.PUBLIC_URL}/assets/KittyAvatar/eyes_${n}.png`
+    n => `${process.env.PUBLIC_URL}/assets/UniqueItemAvatar/eyes_${n}.png`
   ),
   mouth: genArray(1, 10).map(
-    n => `${process.env.PUBLIC_URL}/assets/KittyAvatar/mouth_${n}.png`
+    n => `${process.env.PUBLIC_URL}/assets/UniqueItemAvatar/mouth_${n}.png`
   ),
   fur: genArray(1, 10).map(
-    n => `${process.env.PUBLIC_URL}/assets/KittyAvatar/fur_${n}.png`
+    n => `${process.env.PUBLIC_URL}/assets/UniqueItemAvatar/fur_${n}.png`
   ),
 }
 
@@ -35,7 +35,7 @@ const dnaToAttributes = dna => {
   }
 }
 
-const KittyAvatar = props => {
+const UniqueItemAvatar = props => {
   const outerStyle = { height: '160px', position: 'relative', width: '50%' }
   const innerStyle = {
     height: '150px',
@@ -59,4 +59,4 @@ const KittyAvatar = props => {
   )
 }
 
-export default KittyAvatar
+export default UniqueItemAvatar

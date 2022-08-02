@@ -9,14 +9,14 @@ import {
   Label,
 } from 'semantic-ui-react'
 
-import KittyAvatar from './KittyAvatar'
+import UniqueItemAvatar from './UniqueItemAvatar'
 import { useSubstrateState } from './substrate-lib'
 import { TxButton } from './substrate-lib/components'
 
 // --- Transfer Modal ---
 
 const TransferModal = props => {
-  const { kitty, setStatus } = props
+  const { item, setStatus } = props
   const [open, setOpen] = React.useState(false)
   const [formValue, setFormValue] = React.useState({})
 
@@ -40,10 +40,10 @@ const TransferModal = props => {
         </Button>
       }
     >
-      <Modal.Header>Kitty Transfer</Modal.Header>
+      <Modal.Header>UniqueItem Transfer</Modal.Header>
       <Modal.Content>
         <Form>
-          <Form.Input fluid label="Kitty ID" readOnly value={kitty.dna} />
+          <Form.Input fluid label="UniqueItem ID" readOnly value={item.id} />
           <Form.Input
             fluid
             label="Receiver"
@@ -62,9 +62,9 @@ const TransferModal = props => {
           setStatus={setStatus}
           onClick={confirmAndClose}
           attrs={{
-            palletRpc: 'substrateKitties',
+            palletRpc: 'nfts',
             callable: 'transfer',
-            inputParams: [formValue.target, kitty.dna],
+            inputParams: [formValue.target, item.id],
             paramFields: [true, true],
           }}
         />
@@ -76,7 +76,7 @@ const TransferModal = props => {
 // --- Set Price ---
 
 const SetPrice = props => {
-  const { kitty, setStatus } = props
+  const { item, setStatus } = props
   const [open, setOpen] = React.useState(false)
   const [formValue, setFormValue] = React.useState({})
 
@@ -100,10 +100,10 @@ const SetPrice = props => {
         </Button>
       }
     >
-      <Modal.Header>Set Kitty Price</Modal.Header>
+      <Modal.Header>Set UniqueItem Price</Modal.Header>
       <Modal.Content>
         <Form>
-          <Form.Input fluid label="Kitty ID" readOnly value={kitty.dna} />
+          <Form.Input fluid label="UniqueItem ID" readOnly value={item.id} />
           <Form.Input
             fluid
             label="Price"
@@ -122,9 +122,9 @@ const SetPrice = props => {
           setStatus={setStatus}
           onClick={confirmAndClose}
           attrs={{
-            palletRpc: 'substrateKitties',
+            palletRpc: 'nfts',
             callable: 'setPrice',
-            inputParams: [kitty.dna, formValue.target],
+            inputParams: [item.id, formValue.target],
             paramFields: [true, true],
           }}
         />
@@ -133,10 +133,10 @@ const SetPrice = props => {
   )
 }
 
-// --- Buy Kitty ---
+// --- Buy UniqueItem ---
 
-const BuyKitty = props => {
-  const { kitty, setStatus } = props
+const BuyUniqueItem = props => {
+  const { item, setStatus } = props
   const [open, setOpen] = React.useState(false)
 
   const confirmAndClose = unsub => {
@@ -144,7 +144,7 @@ const BuyKitty = props => {
     if (unsub && typeof unsub === 'function') unsub()
   }
 
-  if (!kitty.price) {
+  if (!item.price) {
     return <></>
   }
 
@@ -155,15 +155,15 @@ const BuyKitty = props => {
       open={open}
       trigger={
         <Button basic color="green">
-          Buy Kitty
+          Buy UniqueItem
         </Button>
       }
     >
-      <Modal.Header>Buy Kitty</Modal.Header>
+      <Modal.Header>Buy UniqueItem</Modal.Header>
       <Modal.Content>
         <Form>
-          <Form.Input fluid label="Kitty ID" readOnly value={kitty.dna} />
-          <Form.Input fluid label="Price" readOnly value={kitty.price} />
+          <Form.Input fluid label="UniqueItem ID" readOnly value={item.id} />
+          <Form.Input fluid label="Price" readOnly value={item.price} />
         </Form>
       </Modal.Content>
       <Modal.Actions>
@@ -171,14 +171,14 @@ const BuyKitty = props => {
           Cancel
         </Button>
         <TxButton
-          label="Buy Kitty"
+          label="Buy UniqueItem"
           type="SIGNED-TX"
           setStatus={setStatus}
           onClick={confirmAndClose}
           attrs={{
-            palletRpc: 'substrateKitties',
-            callable: 'buyKitty',
-            inputParams: [kitty.dna, kitty.price],
+            palletRpc: 'nfts',
+            callable: 'buyUniqueItem',
+            inputParams: [item.id, item.price],
             paramFields: [true, true],
           }}
         />
@@ -187,14 +187,14 @@ const BuyKitty = props => {
   )
 }
 
-// --- About Kitty Card ---
+// --- About UniqueItem Card ---
 
-const KittyCard = props => {
-  const { kitty, setStatus } = props
-  const { dna = null, owner = null, gender = null, price = null } = kitty
-  const displayDna = dna && dna.toJSON()
+const UniqueItemCard = props => {
+  const { item, setStatus } = props
+  const { id = null, owner = null, gender = null, price = null } = item
+  const displayDna = id && id.toJSON()
   const { currentAccount } = useSubstrateState()
-  const isSelf = currentAccount.address === kitty.owner
+  const isSelf = currentAccount.address === item.owner
 
   return (
     <Card>
@@ -203,7 +203,7 @@ const KittyCard = props => {
           Mine
         </Label>
       )}
-      <KittyAvatar dna={dna.toU8a()} />
+      <UniqueItemAvatar id={id.toU8a()} />
       <Card.Content>
         <Card.Meta style={{ fontSize: '.9em', overflowWrap: 'break-word' }}>
           DNA: {displayDna}
@@ -219,12 +219,12 @@ const KittyCard = props => {
       <Card.Content extra style={{ textAlign: 'center' }}>
         {owner === currentAccount.address ? (
           <>
-            <SetPrice kitty={kitty} setStatus={setStatus} />
-            <TransferModal kitty={kitty} setStatus={setStatus} />
+            <SetPrice item={item} setStatus={setStatus} />
+            <TransferModal item={item} setStatus={setStatus} />
           </>
         ) : (
           <>
-            <BuyKitty kitty={kitty} setStatus={setStatus} />
+            <BuyUniqueItem item={item} setStatus={setStatus} />
           </>
         )}
       </Card.Content>
@@ -232,14 +232,14 @@ const KittyCard = props => {
   )
 }
 
-const KittyCards = props => {
-  const { kitties, setStatus } = props
+const UniqueItemCards = props => {
+  const { uniqueItems, setStatus } = props
 
-  if (kitties.length === 0) {
+  if (uniqueItems.length === 0) {
     return (
       <Message info>
         <Message.Header>
-          No Kitty found here... Create one now!&nbsp;
+          No UniqueItem found here... Create one now!&nbsp;
           <span role="img" aria-label="point-down">
             👇
           </span>
@@ -250,13 +250,13 @@ const KittyCards = props => {
 
   return (
     <Grid columns={3}>
-      {kitties.map((kitty, i) => (
-        <Grid.Column key={`kitty-${i}`}>
-          <KittyCard kitty={kitty} setStatus={setStatus} />
+      {uniqueItems.map((item, i) => (
+        <Grid.Column key={`item-${i}`}>
+          <UniqueItemCard item={item} setStatus={setStatus} />
         </Grid.Column>
       ))}
     </Grid>
   )
 }
 
-export default KittyCards
+export default UniqueItemCards

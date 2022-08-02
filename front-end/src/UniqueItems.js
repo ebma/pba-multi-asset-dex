@@ -4,38 +4,34 @@ import { Form, Grid } from 'semantic-ui-react'
 import { useSubstrateState } from './substrate-lib'
 import { TxButton } from './substrate-lib/components'
 
-import KittyCards from './KittyCards'
+import UniqueItemCards from './UniqueItemCards'
 
-const parseKitty = ({ dna, price, gender, owner }) => ({
-  dna,
+const parseItem = ({ id, data, price, owner }) => ({
+  id,
+  data,
   price: price.toJSON(),
-  gender: gender.toJSON(),
   owner: owner.toJSON(),
 })
 
-function toHexString(byteArray) {
-  var s = '0x'
-  byteArray.forEach(function (byte) {
-    s += ('0' + (byte & 0xff).toString(16)).slice(-2)
-  })
-  return s
-}
-
-export default function Kitties(props) {
+export default function UniqueItems(props) {
   const { api, keyring } = useSubstrateState()
-  const [kittyIds, setKittyIds] = useState([])
-  const [kitties, setKitties] = useState([])
+  const [itemIds, setItemIds] = useState([])
+  const [uniqueItems, setUniqueItems] = useState([])
   const [status, setStatus] = useState('')
 
   const subscribeCount = () => {
     let unsub = null
 
     const asyncFetch = async () => {
-      unsub = await api.query.substrateKitties.countForKitties(async count => {
-        // Fetch all kitty keys
-        const entries = await api.query.substrateKitties.kitties.entries()
-        const ids = entries.map(entry => toHexString(entry[0].slice(-32)))
-        setKittyIds(ids)
+      unsub = await api.query.nfts.countForUniqueItems(async count => {
+        const entries = await api.query.nfts.uniqueItems.entries()
+        let ids = [];
+        entries.forEach(([key, exposure]) => {
+          console.log('     exposure:', exposure.toHuman());
+          let id = exposure.toHuman()["id"];
+          ids.push(id);
+        });
+        setItemIds(ids)
       })
     }
 
@@ -46,15 +42,17 @@ export default function Kitties(props) {
     }
   }
 
-  const subscribeKitties = () => {
+  console.log("uniqueItems", uniqueItems)
+
+  const subscribeUniqueItems = () => {
     let unsub = null
 
     const asyncFetch = async () => {
-      unsub = await api.query.substrateKitties.kitties.multi(
-        kittyIds,
-        kitties => {
-          const kittiesMap = kitties.map(kitty => parseKitty(kitty.unwrap()))
-          setKitties(kittiesMap)
+      unsub = await api.query.nfts.uniqueItems.multi(
+        itemIds,
+        items => {
+          const itemsMap = items.map(item => parseItem(item.unwrap()))
+          setUniqueItems(itemsMap)
         }
       )
     }
@@ -67,12 +65,12 @@ export default function Kitties(props) {
   }
 
   useEffect(subscribeCount, [api, keyring])
-  useEffect(subscribeKitties, [api, keyring, kittyIds])
+  useEffect(subscribeUniqueItems, [api, keyring, itemIds])
 
   return (
     <Grid.Column width={16}>
-      <h1>Kitties</h1>
-      <KittyCards kitties={kitties} setStatus={setStatus} />
+      <h1>UniqueItems</h1>
+      <UniqueItemCards uniqueItems={uniqueItems} setStatus={setStatus} />
       <Form style={{ margin: '1em 0' }}>
         <Form.Field style={{ textAlign: 'center' }}>
           <TxButton
@@ -80,8 +78,8 @@ export default function Kitties(props) {
             type="SIGNED-TX"
             setStatus={setStatus}
             attrs={{
-              palletRpc: 'substrateKitties',
-              callable: 'createKitty',
+              palletRpc: 'nfts',
+              callable: 'createUniqueItem',
               inputParams: [],
               paramFields: [],
             }}
