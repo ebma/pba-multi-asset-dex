@@ -2,10 +2,11 @@
 
 use crate::{mock::*, pallet::Error, *};
 use frame_support::{assert_noop, assert_ok};
+use sp_runtime::BoundedVec;
 
 // This function checks that unique_item ownership is set correctly in storage.
 // This will panic if things are not correct.
-fn assert_ownership(owner: u64, unique_item_id: [u8; 16]) {
+fn assert_ownership(owner: u64, unique_item_id: ItemIdOf<Test>) {
 	// For a unique_item to be owned it should exist.
 	let unique_item = UniqueItems::<Test>::get(unique_item_id).unwrap();
 	// The unique_item's owner is set correctly.
@@ -25,8 +26,8 @@ fn assert_ownership(owner: u64, unique_item_id: [u8; 16]) {
 #[test]
 fn should_build_genesis_unique_items() {
 	new_test_ext(vec![
-		(1, *b"1234567890123456", Gender::Female),
-		(2, *b"123456789012345a", Gender::Male),
+		(1, *b"1234567890123456", b"test".to_vec()),
+		(2, *b"123456789012345a", b"othertest".to_vec()),
 	])
 	.execute_with(|| {
 		// Check we have 2 unique_items, as specified in genesis
@@ -52,7 +53,9 @@ fn should_build_genesis_unique_items() {
 fn create_unique_item_should_work() {
 	new_test_ext(vec![]).execute_with(|| {
 		// Create a unique_item with account #10
-		assert_ok!(Nfts::create_unique_item(Origin::signed(10)));
+		let unique_item_id = *b"1234567890123456";
+		let data = BoundedVec::truncate_from(b"test".to_vec());
+		assert_ok!(Nfts::create_unique_item(Origin::signed(10), unique_item_id, data.clone()));
 
 		// Check that now 3 unique_items exists
 		assert_eq!(CountForUniqueItems::<Test>::get(), 1);
@@ -66,7 +69,8 @@ fn create_unique_item_should_work() {
 		// Check that multiple create_unique_item calls work in the same block.
 		// Increment extrinsic index to add entropy for DNA
 		frame_system::Pallet::<Test>::set_extrinsic_index(1);
-		assert_ok!(Nfts::create_unique_item(Origin::signed(10)));
+		let other_unique_item_id = *b"1234567890123450";
+		assert_ok!(Nfts::create_unique_item(Origin::signed(10), other_unique_item_id, data.clone()));
 	});
 }
 
@@ -74,25 +78,33 @@ fn create_unique_item_should_work() {
 fn create_unique_item_fails() {
 	// Check that create_unique_item fails when user owns too many unique_items.
 	new_test_ext(vec![]).execute_with(|| {
+		// Data used for all items
+		let data = BoundedVec::truncate_from(b"test".to_vec());
+
 		// Create `MaxUniqueItemsOwned` unique_items with account #10
 		for _i in 0..<Test as Config>::MaxUniqueItemsOwned::get() {
-			assert_ok!(Nfts::create_unique_item(Origin::signed(10)));
+			let unique_item_id: [u8; 16] = [_i as u8; 16];
+			assert_ok!(Nfts::create_unique_item(Origin::signed(10), unique_item_id, data.clone()));
 			// We do this because the hash of the unique_item depends on this for seed,
 			// so changing this allows you to have a different unique_item id
 			System::set_block_number(System::block_number() + 1);
 		}
 
 		// Can't create 1 more
-		assert_noop!(Nfts::create_unique_item(Origin::signed(10)), Error::<Test>::TooManyOwned);
+		let unique_item_id: [u8; 16] = [u8::MAX; 16];
+		assert_noop!(
+			Nfts::create_unique_item(Origin::signed(10), unique_item_id, data.clone()),
+			Error::<Test>::TooManyOwned
+		);
 
 		// Minting a unique_item with DNA that already exists should fail
-		let id = [0u8; 16];
+		let id = [u8::MAX; 16];
 
 		// Mint new unique_item with `id`
-		assert_ok!(Nfts::mint(&1, id, Gender::Male));
+		assert_ok!(Nfts::mint(&1, id, data.clone()));
 
 		// Mint another unique_item with the same `id` should fail
-		assert_noop!(Nfts::mint(&1, id, Gender::Male), Error::<Test>::DuplicateUniqueItem);
+		assert_noop!(Nfts::mint(&1, id, data.clone()), Error::<Test>::DuplicateUniqueItem);
 	});
 }
 
@@ -100,7 +112,9 @@ fn create_unique_item_fails() {
 fn transfer_unique_item_should_work() {
 	new_test_ext(vec![]).execute_with(|| {
 		// Account 10 creates a unique_item
-		assert_ok!(Nfts::create_unique_item(Origin::signed(10)));
+		let unique_item_id: [u8; 16] = [0u8; 16];
+		let data = BoundedVec::truncate_from(b"test".to_vec());
+		assert_ok!(Nfts::create_unique_item(Origin::signed(10), unique_item_id, data));
 		let id = UniqueItemsOwned::<Test>::get(10)[0];
 
 		// and sends it to account 3
@@ -117,19 +131,15 @@ fn transfer_unique_item_should_work() {
 
 #[test]
 fn transfer_unique_item_should_fail() {
-	new_test_ext(vec![
-		(1, *b"1234567890123456", Gender::Female),
-		(2, *b"123456789012345a", Gender::Male),
-	])
-	.execute_with(|| {
+	new_test_ext(vec![(1, *b"1234567890123456", b"test".to_vec()), (2, *b"123456789012345a", b"othertest".to_vec())]).execute_with(|| {
 		// Get the DNA of some unique_item
-		let dna = UniqueItemsOwned::<Test>::get(1)[0];
+		let id = UniqueItemsOwned::<Test>::get(1)[0];
 
 		// Account 9 cannot transfer a unique_item with this DNA.
-		assert_noop!(Nfts::transfer(Origin::signed(9), 2, dna), Error::<Test>::NotOwner);
+		assert_noop!(Nfts::transfer(Origin::signed(9), 2, id), Error::<Test>::NotOwner);
 
 		// Check transfer fails when transferring to self
-		assert_noop!(Nfts::transfer(Origin::signed(1), 1, dna), Error::<Test>::TransferToSelf);
+		assert_noop!(Nfts::transfer(Origin::signed(1), 1, id), Error::<Test>::TransferToSelf);
 
 		// Check transfer fails when no unique_item exists
 		let random_id = [0u8; 16];
@@ -139,125 +149,23 @@ fn transfer_unique_item_should_fail() {
 		// Check that transfer fails when max unique_item is reached
 		// Create `MaxUniqueItemsOwned` unique_items for account #10
 		for _i in 0..<Test as Config>::MaxUniqueItemsOwned::get() {
-			assert_ok!(Nfts::create_unique_item(Origin::signed(10)));
+			let unique_item_id: [u8; 16] = [_i as u8; 16];
+			let data = BoundedVec::truncate_from(b"test".to_vec());
+			assert_ok!(Nfts::create_unique_item(Origin::signed(10), unique_item_id, data));
 			System::set_block_number(System::block_number() + 1);
 		}
 
 		// Account #10 should not be able to receive a new unique_item
-		assert_noop!(Nfts::transfer(Origin::signed(1), 10, dna), Error::<Test>::TooManyOwned);
-	});
-}
-
-#[test]
-fn breed_unique_item_works() {
-	// Check that breed unique_item works as expected.
-	new_test_ext(vec![(2, *b"123456789012345a", Gender::Male)]).execute_with(|| {
-		// Get mom and dad unique_items from account #1
-		let mom = [0u8; 16];
-		assert_ok!(Nfts::mint(&1, mom, Gender::Female));
-
-		// Mint male unique_item for account #1
-		let dad = [1u8; 16];
-		assert_ok!(Nfts::mint(&1, dad, Gender::Male));
-
-		// Breeder can only breed unique_items they own
-		assert_ok!(Nfts::breed_unique_item(Origin::signed(1), mom, dad));
-
-		// Check the new unique_item exists and DNA is from the mom and dad
-		let new_dna = UniqueItemsOwned::<Test>::get(1)[2];
-		for &i in new_dna.iter() {
-			assert!(i == 0u8 || i == 1u8)
-		}
-
-		// UniqueItem cant breed with itself
-		assert_noop!(Nfts::breed_unique_item(Origin::signed(1), mom, mom), Error::<Test>::CantBreed);
-
-		// Two unique_items must be bred by the same owner
-		// Get the unique_item owned by account #1
-		let unique_item_1 = UniqueItemsOwned::<Test>::get(1)[0];
-
-		// Another unique_item from another owner
-		let unique_item_2 = UniqueItemsOwned::<Test>::get(2)[0];
-
-		// Breeder can only breed unique_items they own
-		assert_noop!(
-			Nfts::breed_unique_item(Origin::signed(1), unique_item_1, unique_item_2),
-			Error::<Test>::NotOwner
-		);
-	});
-}
-
-#[test]
-fn breed_unique_item_fails() {
-	new_test_ext(vec![]).execute_with(|| {
-		// Check that breed_unique_item checks opposite gender
-		let unique_item_1 = [1u8; 16];
-		let unique_item_2 = [3u8; 16];
-
-		// Mint two Female unique_items
-		assert_ok!(Nfts::mint(&3, unique_item_1, Gender::Female));
-		assert_ok!(Nfts::mint(&3, unique_item_2, Gender::Female));
-
-		// And a male unique_item
-		let unique_item_3 = [4u8; 16];
-		assert_ok!(Nfts::mint(&3, unique_item_3, Gender::Male));
-
-		// Same gender unique_item can't breed
-		assert_noop!(
-			Nfts::breed_unique_item(Origin::signed(3), unique_item_1, unique_item_2),
-			Error::<Test>::CantBreed
-		);
-
-		// Check that breed unique_item fails with too many unique_items
-		// Account 3 already has 3 unique_items so we subtract that from our max
-		for _i in 0..<Test as Config>::MaxUniqueItemsOwned::get() - 3 {
-			assert_ok!(Nfts::create_unique_item(Origin::signed(3)));
-			// We do this to avoid getting a `DuplicateUniqueItem` error
-			System::set_block_number(System::block_number() + 1);
-		}
-
-		// Breed should fail if breeder has reached MaxUniqueItemsOwned
-		assert_noop!(
-			Nfts::breed_unique_item(Origin::signed(3), unique_item_1, unique_item_3),
-			Error::<Test>::TooManyOwned
-		);
-	});
-}
-
-#[test]
-fn dna_helpers_work_as_expected() {
-	new_test_ext(vec![]).execute_with(|| {
-		// Test gen_dna and other dna functions behave as expected
-		// Get two unique_item dnas
-		let dna_1 = [1u8; 16];
-		let dna_2 = [2u8; 16];
-
-		// Generate unique Gender and DNA
-		let (dna, _) = Nfts::breed_dna(&dna_1, &dna_2);
-
-		// Check that the new unique_item is actually a child of one of its parents
-		// DNA bytes must be a mix of mom or dad's DNA
-		for &i in dna.iter() {
-			assert!(i == 1u8 || i == 2u8)
-		}
-
-		// Test that randomness works in same block
-		let (random_dna_1, _) = Nfts::gen_dna();
-		// increment extrinsic index
-		frame_system::Pallet::<Test>::set_extrinsic_index(1);
-		let (random_dna_2, _) = Nfts::gen_dna();
-
-		// Random values should not be equal
-		assert_ne!(random_dna_1, random_dna_2);
+		assert_noop!(Nfts::transfer(Origin::signed(1), 10, id), Error::<Test>::TooManyOwned);
 	});
 }
 
 #[test]
 fn buy_unique_item_works() {
 	new_test_ext(vec![
-		(1, *b"1234567890123456", Gender::Female),
-		(2, *b"123456789012345a", Gender::Male),
-		(3, *b"1234567890123451", Gender::Male),
+		(1, *b"1234567890123456", b"test".to_vec()),
+		(2, *b"123456789012345a", b"test".to_vec()),
+		(3, *b"1234567890123451", b"test".to_vec()),
 	])
 	.execute_with(|| {
 		// Check buy_unique_item works as expected
@@ -282,23 +190,29 @@ fn buy_unique_item_works() {
 		assert_eq!(balance_2_before + set_price.0, balance_2_after);
 
 		// Now this unique_item is not for sale, even from an account who can afford it
-		assert_noop!(Nfts::buy_unique_item(Origin::signed(3), id, set_price), Error::<Test>::NotForSale);
+		assert_noop!(
+			Nfts::buy_unique_item(Origin::signed(3), id, set_price),
+			Error::<Test>::NotForSale
+		);
 	});
 }
 
 #[test]
 fn buy_unique_item_fails() {
 	new_test_ext(vec![
-		(1, *b"1234567890123456", Gender::Female),
-		(2, *b"123456789012345a", Gender::Male),
-		(10, *b"1234567890123410", Gender::Male),
+		(1, *b"1234567890123456", b"test".to_vec()),
+		(2, *b"123456789012345a", b"test".to_vec()),
+		(10, *b"1234567890123410", b"test".to_vec()),
 	])
 	.execute_with(|| {
 		// Check buy_unique_item fails when unique_item is not for sale
 		let id = UniqueItemsOwned::<Test>::get(1)[0];
 		// UniqueItem is not for sale
 		let price: PriceOf<Test> = (2, ASSET_1);
-		assert_noop!(Nfts::buy_unique_item(Origin::signed(2), id, price), Error::<Test>::NotForSale);
+		assert_noop!(
+			Nfts::buy_unique_item(Origin::signed(2), id, price),
+			Error::<Test>::NotForSale
+		);
 
 		// Check buy_unique_item fails when bid price is too low
 		// New price is set to 4
@@ -333,11 +247,7 @@ fn buy_unique_item_fails() {
 
 #[test]
 fn set_price_works() {
-	new_test_ext(vec![
-		(1, *b"1234567890123456", Gender::Female),
-		(2, *b"123456789012345a", Gender::Male),
-	])
-	.execute_with(|| {
+	new_test_ext(vec![(1, *b"1234567890123456", b"test".to_vec()), (2, *b"123456789012345a", b"test".to_vec())]).execute_with(|| {
 		// Check set_price works as expected
 		let id = UniqueItemsOwned::<Test>::get(2)[0];
 		let set_price: PriceOf<Test> = (4, ASSET_1);

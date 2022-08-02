@@ -9,14 +9,13 @@ use frame_support::{
 };
 use frame_system as system;
 use orml_traits::parameter_type_with_key;
-use pallet_unique_items::Gender;
 use primitives::{CurrencyId, TokenSymbol};
 pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, ConstU128, ConvertInto, IdentityLookup, Zero},
-	BuildStorage,
+	BoundedVec, BuildStorage,
 };
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -88,17 +87,21 @@ impl pallet_balances::Config for Test {
 
 parameter_types! {
 	// One can owned at most 9,999 UniqueItems
-	pub const MaxUniqueItemsOwned: u32 = 9999;
+	pub const MaxUniqueItemsOwned: u32 = 100;
+	pub const StringLimit: u32 = 255;
 }
 
 pub type AssetId = CurrencyId;
 pub type Balance = u128;
+pub type ItemId = [u8; 16];
 
 impl pallet_unique_items::Config for Test {
 	type Event = Event;
 	type Balance = Balance;
 	type AssetId = AssetId;
+	type ItemId = ItemId;
 	type Assets = Tokens;
+	type StringLimit = StringLimit;
 	type MaxUniqueItemsOwned = MaxUniqueItemsOwned;
 	type UniqueItemRandomness = RandomnessCollectiveFlip;
 }
@@ -134,7 +137,7 @@ impl pallet_randomness_collective_flip::Config for Test {}
 pub const ASSET_1: AssetId = CurrencyId::Token(TokenSymbol::Short([0; 4]));
 pub const ASSET_2: AssetId = CurrencyId::Token(TokenSymbol::Short([1; 4]));
 
-pub(crate) fn new_test_ext(users: Vec<(u64, [u8; 16], Gender)>) -> sp_io::TestExternalities {
+pub(crate) fn new_test_ext(users: Vec<(u64, [u8; 16], Vec<u8>)>) -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 	GenesisConfig {
 		tokens: TokensConfig {
@@ -150,7 +153,16 @@ pub(crate) fn new_test_ext(users: Vec<(u64, [u8; 16], Gender)>) -> sp_io::TestEx
 				.collect(),
 		},
 		nfts: NftsConfig {
-			unique_items: users.iter().map(|(user, unique_item, gender)| (*user, *unique_item, *gender)).collect(),
+			unique_items: users
+				.iter()
+				.map(|(user, unique_item, data)| {
+					(
+						*user,
+						*unique_item,
+						BoundedVec::<u8, StringLimit>::truncate_from(data.clone()),
+					)
+				})
+				.collect(),
 		},
 		..Default::default()
 	}
