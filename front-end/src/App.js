@@ -65,18 +65,20 @@ function Main() {
           <Grid.Row>
             <Kitties />
           </Grid.Row>
-          <Grid.Row stretched>
-            <NodeInfo />
-            <Metadata />
-            <BlockNumber />
-            <BlockNumber finalized />
+          <Grid.Row>
+            <Events />
           </Grid.Row>
           <Grid.Row stretched>
             <Balances />
           </Grid.Row>
           <Grid.Row>
             <Interactor />
-            <Events />
+          </Grid.Row>
+          <Grid.Row stretched>
+            <NodeInfo />
+            <Metadata />
+            <BlockNumber />
+            <BlockNumber finalized />
           </Grid.Row>
         </Grid>
       </Container>

@@ -108,7 +108,13 @@ const SetPrice = props => {
             fluid
             label="Price"
             placeholder="Enter Price"
-            onChange={formChange('target')}
+            onChange={formChange('amount')}
+          />
+          <Form.Input
+            fluid
+            label="Currency (4 or 8 letters currency e.g. 'EURT' or 'EURTUSDC')"
+            placeholder="Enter Currency"
+            onChange={formChange('currency')}
           />
         </Form>
       </Modal.Content>
@@ -124,8 +130,8 @@ const SetPrice = props => {
           attrs={{
             palletRpc: 'nfts',
             callable: 'setPrice',
-            inputParams: [item.id, formValue.target],
-            paramFields: [true, true],
+            inputParams: [item.id, formValue.amount, formValue.currency],
+            paramFields: [true, true, true],
           }}
         />
       </Modal.Actions>
@@ -163,7 +169,7 @@ const BuyUniqueItem = props => {
       <Modal.Content>
         <Form>
           <Form.Input fluid label="UniqueItem ID" readOnly value={item.id} />
-          <Form.Input fluid label="Price" readOnly value={item.price} />
+          <Form.Input fluid label="Price" readOnly value={item.price[0].toString()} />
         </Form>
       </Modal.Content>
       <Modal.Actions>
@@ -195,6 +201,8 @@ const UniqueItemCard = props => {
   const { currentAccount } = useSubstrateState()
   const isSelf = currentAccount.address === item.owner
 
+  console.log("price", price)
+
   return (
     <Card>
       {isSelf && (
@@ -211,7 +219,7 @@ const UniqueItemCard = props => {
           <p style={{ overflowWrap: 'break-word' }}>Data: {data.toHuman()}</p>
           <p style={{ overflowWrap: 'break-word' }}>Owner: {owner}</p>
           <p style={{ overflowWrap: 'break-word' }}>
-            Price: {price || 'Not For Sale'}
+            Price: {price != null ? `${price[0]} ${price[1].token.short}` : 'Not For Sale'}
           </p>
         </Card.Description>
       </Card.Content>
