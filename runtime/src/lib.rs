@@ -303,17 +303,23 @@ parameter_types! {
 }
 
 parameter_types! {
-	// One can own at most 9,999 Kitties
-	pub const MaxKittiesOwned: u32 = 9999;
+	// One can own at most 9,999 UniqueItems
+	pub const MaxUniqueItemsOwned: u32 = 9999;
+	// The data of a UniqueItem is limited to 255 bytes
+	pub const StringLimit: u32 = 255;
 }
+
+type ItemId = u128;
 
 impl pallet_nft::Config for Runtime {
 	type Event = Event;
 	type Balance = Balance;
 	type AssetId = CurrencyId;
+	type ItemId = ItemId;
 	type Assets = Tokens;
-	type MaxKittiesOwned = MaxKittiesOwned;
-	type KittyRandomness = RandomnessCollectiveFlip;
+	type StringLimit = StringLimit;
+	type MaxUniqueItemsOwned = MaxUniqueItemsOwned;
+	type UniqueItemRandomness = RandomnessCollectiveFlip;
 }
 
 parameter_types! {
