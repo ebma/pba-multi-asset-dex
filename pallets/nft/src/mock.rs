@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate as pallet_kitties;
+use crate as pallet_unique_items;
 use crate as pallet_nft;
 use frame_support::{
 	parameter_types,
@@ -9,7 +9,7 @@ use frame_support::{
 };
 use frame_system as system;
 use orml_traits::parameter_type_with_key;
-use pallet_kitties::Gender;
+use pallet_unique_items::Gender;
 use primitives::{CurrencyId, TokenSymbol};
 pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
 use sp_core::H256;
@@ -88,19 +88,19 @@ impl pallet_balances::Config for Test {
 
 parameter_types! {
 	// One can owned at most 9,999 UniqueItems
-	pub const MaxKittiesOwned: u32 = 9999;
+	pub const MaxUniqueItemsOwned: u32 = 9999;
 }
 
 pub type AssetId = CurrencyId;
 pub type Balance = u128;
 
-impl pallet_kitties::Config for Test {
+impl pallet_unique_items::Config for Test {
 	type Event = Event;
 	type Balance = Balance;
 	type AssetId = AssetId;
 	type Assets = Tokens;
-	type MaxKittiesOwned = MaxKittiesOwned;
-	type KittyRandomness = RandomnessCollectiveFlip;
+	type MaxUniqueItemsOwned = MaxUniqueItemsOwned;
+	type UniqueItemRandomness = RandomnessCollectiveFlip;
 }
 
 parameter_types! {
@@ -150,7 +150,7 @@ pub(crate) fn new_test_ext(users: Vec<(u64, [u8; 16], Gender)>) -> sp_io::TestEx
 				.collect(),
 		},
 		nfts: NftsConfig {
-			unique_items: users.iter().map(|(user, kitty, gender)| (*user, *kitty, *gender)).collect(),
+			unique_items: users.iter().map(|(user, unique_item, gender)| (*user, *unique_item, *gender)).collect(),
 		},
 		..Default::default()
 	}

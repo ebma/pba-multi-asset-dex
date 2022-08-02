@@ -17,7 +17,7 @@ mod tests;
 mod traits;
 mod types;
 use types::*;
-use traits::{Kitty, Gender};
+use traits::{UniqueItem, Gender};
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -70,26 +70,26 @@ pub mod pallet {
 
 		/// The maximum amount of unique_items a single account can own.
 		#[pallet::constant]
-		type MaxKittiesOwned: Get<u32>;
+		type MaxUniqueItemsOwned: Get<u32>;
 
 		/// The type of Randomness we want to specify for this pallet.
-		type KittyRandomness: Randomness<Self::Hash, Self::BlockNumber>;
+		type UniqueItemRandomness: Randomness<Self::Hash, Self::BlockNumber>;
 	}
 
 	// Errors
 	#[pallet::error]
 	pub enum Error<T> {
-		/// An account may only own `MaxKittiesOwned` kitties.
+		/// An account may only own `MaxUniqueItemsOwned` unique_items.
 		TooManyOwned,
-		/// Trying to transfer or buy a kitty from oneself.
+		/// Trying to transfer or buy a unique_item from oneself.
 		TransferToSelf,
-		/// This kitty already exists!
-		DuplicateKitty,
-		/// This kitty does not exist!
-		NoKitty,
-		/// You are not the owner of this kitty.
+		/// This unique_item already exists!
+		DuplicateUniqueItem,
+		/// This unique_item does not exist!
+		NoUniqueItem,
+		/// You are not the owner of this unique_item.
 		NotOwner,
-		/// This kitty is not for sale.
+		/// This unique_item is not for sale.
 		NotForSale,
 		/// Ensures that the buying price is greater than the asking price.
 		BidPriceTooLow,
@@ -101,31 +101,31 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// A new kitty was successfully created.
-		Created { kitty: [u8; 16], owner: T::AccountId },
-		/// The price of a kitty was successfully set.
-		PriceSet { kitty: [u8; 16], price: Option<PriceOf<T>> },
-		/// A kitty was successfully transferred.
-		Transferred { from: T::AccountId, to: T::AccountId, kitty: [u8; 16] },
-		/// A kitty was successfully sold.
-		Sold { seller: T::AccountId, buyer: T::AccountId, kitty: [u8; 16], price: PriceOf<T> },
+		/// A new unique_item was successfully created.
+		Created { unique_item: [u8; 16], owner: T::AccountId },
+		/// The price of a unique_item was successfully set.
+		PriceSet { unique_item: [u8; 16], price: Option<PriceOf<T>> },
+		/// A unique_item was successfully transferred.
+		Transferred { from: T::AccountId, to: T::AccountId, unique_item: [u8; 16] },
+		/// A unique_item was successfully sold.
+		Sold { seller: T::AccountId, buyer: T::AccountId, unique_item: [u8; 16], price: PriceOf<T> },
 	}
 
 	/// Keeps track of the number of unique_items in existence.
 	#[pallet::storage]
-	pub(super) type CountForKitties<T: Config> = StorageValue<_, u64, ValueQuery>;
+	pub(super) type CountForUniqueItems<T: Config> = StorageValue<_, u64, ValueQuery>;
 
-	/// Maps the kitty struct to the kitty DNA.
+	/// Maps the unique_item struct to the unique_item DNA.
 	#[pallet::storage]
-	pub(super) type UniqueItems<T: Config> = StorageMap<_, Twox64Concat, [u8; 16], Kitty<T>>;
+	pub(super) type UniqueItems<T: Config> = StorageMap<_, Twox64Concat, [u8; 16], UniqueItem<T>>;
 
 	/// Track the unique_items owned by each account.
 	#[pallet::storage]
-	pub(super) type KittiesOwned<T: Config> = StorageMap<
+	pub(super) type UniqueItemsOwned<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		T::AccountId,
-		BoundedVec<[u8; 16], T::MaxKittiesOwned>,
+		BoundedVec<[u8; 16], T::MaxUniqueItemsOwned>,
 		ValueQuery,
 	>;
 
@@ -146,7 +146,7 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
 		fn build(&self) {
-			// When building a kitty from genesis config, we require the DNA and Gender to be
+			// When building a unique_item from genesis config, we require the DNA and Gender to be
 			// supplied
 			for (account, dna, gender) in &self.unique_items {
 				assert!(Pallet::<T>::mint(account, *dna, *gender).is_ok());
@@ -156,28 +156,28 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Create a new unique kitty.
+		/// Create a new unique unique_item.
 		///
-		/// The actual kitty creation is done in the `mint()` function.
+		/// The actual unique_item creation is done in the `mint()` function.
 		#[pallet::weight(0)]
-		pub fn create_kitty(origin: OriginFor<T>) -> DispatchResult {
+		pub fn create_unique_item(origin: OriginFor<T>) -> DispatchResult {
 			// Make sure the caller is from a signed origin
 			let sender = ensure_signed(origin)?;
 
 			// Generate unique DNA and Gender using a helper function
-			let (kitty_gen_dna, gender) = Self::gen_dna();
+			let (unique_item_gen_dna, gender) = Self::gen_dna();
 
-			// Write new kitty to storage by calling helper function
-			Self::mint(&sender, kitty_gen_dna, gender)?;
+			// Write new unique_item to storage by calling helper function
+			Self::mint(&sender, unique_item_gen_dna, gender)?;
 
 			Ok(())
 		}
 
-		/// Breed a kitty.
+		/// Breed a unique_item.
 		///
-		/// Breed two kitties to give birth to a new kitty.
+		/// Breed two unique_items to give birth to a new unique_item.
 		#[pallet::weight(0)]
-		pub fn breed_kitty(
+		pub fn breed_unique_item(
 			origin: OriginFor<T>,
 			parent_1: [u8; 16],
 			parent_2: [u8; 16],
@@ -185,9 +185,9 @@ pub mod pallet {
 			// Make sure the caller is from a signed origin
 			let sender = ensure_signed(origin)?;
 
-			// Get the kitties.
-			let maybe_mom = UniqueItems::<T>::get(&parent_1).ok_or(Error::<T>::NoKitty)?;
-			let maybe_dad = UniqueItems::<T>::get(&parent_2).ok_or(Error::<T>::NoKitty)?;
+			// Get the unique_items.
+			let maybe_mom = UniqueItems::<T>::get(&parent_1).ok_or(Error::<T>::NoUniqueItem)?;
+			let maybe_dad = UniqueItems::<T>::get(&parent_2).ok_or(Error::<T>::NoUniqueItem)?;
 
 			// Check both parents are owned by the caller of this function
 			ensure!(maybe_mom.owner == sender, Error::<T>::NotOwner);
@@ -199,73 +199,73 @@ pub mod pallet {
 			// Create new DNA from these parents
 			let (new_dna, new_gender) = Self::breed_dna(&parent_1, &parent_2);
 
-			// Mint new kitty
+			// Mint new unique_item
 			Self::mint(&sender, new_dna, new_gender)?;
 			Ok(())
 		}
 
-		/// Directly transfer a kitty to another recipient.
+		/// Directly transfer a unique_item to another recipient.
 		///
-		/// Any account that holds a kitty can send it to another Account. This will reset the
-		/// asking price of the kitty, marking it not for sale.
+		/// Any account that holds a unique_item can send it to another Account. This will reset the
+		/// asking price of the unique_item, marking it not for sale.
 		#[pallet::weight(0)]
 		pub fn transfer(
 			origin: OriginFor<T>,
 			to: T::AccountId,
-			kitty_id: [u8; 16],
+			unique_item_id: [u8; 16],
 		) -> DispatchResult {
 			// Make sure the caller is from a signed origin
 			let from = ensure_signed(origin)?;
-			let kitty = UniqueItems::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
-			ensure!(kitty.owner == from, Error::<T>::NotOwner);
-			Self::do_transfer(kitty_id, to, None)?;
+			let unique_item = UniqueItems::<T>::get(&unique_item_id).ok_or(Error::<T>::NoUniqueItem)?;
+			ensure!(unique_item.owner == from, Error::<T>::NotOwner);
+			Self::do_transfer(unique_item_id, to, None)?;
 			Ok(())
 		}
 
-		/// Buy a kitty for sale. The `limit_price` parameter is set as a safeguard against the
+		/// Buy a unique_item for sale. The `limit_price` parameter is set as a safeguard against the
 		/// possibility that the seller front-runs the transaction by setting a high price. A
 		/// front-end should assume that this value is always equal to the actual price of the
-		/// kitty. The buyer will always be charged the actual price of the kitty.
+		/// unique_item. The buyer will always be charged the actual price of the unique_item.
 		///
-		/// If successful, this dispatchable will reset the price of the kitty to `None`, making
-		/// it no longer for sale and handle the balance and kitty transfer between the buyer and
+		/// If successful, this dispatchable will reset the price of the unique_item to `None`, making
+		/// it no longer for sale and handle the balance and unique_item transfer between the buyer and
 		/// seller.
 		#[pallet::weight(0)]
-		pub fn buy_kitty(
+		pub fn buy_unique_item(
 			origin: OriginFor<T>,
-			kitty_id: [u8; 16],
+			unique_item_id: [u8; 16],
 			limit_price: PriceOf<T>,
 		) -> DispatchResult {
 			// Make sure the caller is from a signed origin
 			let buyer = ensure_signed(origin)?;
-			// Transfer the kitty from seller to buyer as a sale
-			Self::do_transfer(kitty_id, buyer, Some(limit_price))?;
+			// Transfer the unique_item from seller to buyer as a sale
+			Self::do_transfer(unique_item_id, buyer, Some(limit_price))?;
 
 			Ok(())
 		}
 
-		/// Set the price for a kitty.
+		/// Set the price for a unique_item.
 		///
-		/// Updates kitty price and updates storage.
+		/// Updates unique_item price and updates storage.
 		#[pallet::weight(0)]
 		pub fn set_price(
 			origin: OriginFor<T>,
-			kitty_id: [u8; 16],
+			unique_item_id: [u8; 16],
 			new_price: Option<PriceOf<T>>,
 		) -> DispatchResult {
 			// Make sure the caller is from a signed origin
 			let sender = ensure_signed(origin)?;
 
-			// Ensure the kitty exists and is called by the kitty owner
-			let mut kitty = UniqueItems::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
-			ensure!(kitty.owner == sender, Error::<T>::NotOwner);
+			// Ensure the unique_item exists and is called by the unique_item owner
+			let mut unique_item = UniqueItems::<T>::get(&unique_item_id).ok_or(Error::<T>::NoUniqueItem)?;
+			ensure!(unique_item.owner == sender, Error::<T>::NotOwner);
 
 			// Set the price in storage
-			kitty.price = new_price;
-			UniqueItems::<T>::insert(&kitty_id, kitty);
+			unique_item.price = new_price;
+			UniqueItems::<T>::insert(&unique_item_id, unique_item);
 
 			// Deposit a "PriceSet" event.
-			Self::deposit_event(Event::PriceSet { kitty: kitty_id, price: new_price });
+			Self::deposit_event(Event::PriceSet { unique_item: unique_item_id, price: new_price });
 
 			Ok(())
 		}
@@ -277,9 +277,9 @@ pub mod pallet {
 		// Generates and returns DNA and Gender
 		pub fn gen_dna() -> ([u8; 16], Gender) {
 			// Create randomness
-			let random = T::KittyRandomness::random(&b"dna"[..]).0;
+			let random = T::UniqueItemRandomness::random(&b"dna"[..]).0;
 
-			// Create randomness payload. Multiple kitties can be generated in the same block,
+			// Create randomness payload. Multiple unique_items can be generated in the same block,
 			// retaining uniqueness.
 			let unique_payload = (
 				random,
@@ -313,10 +313,10 @@ pub mod pallet {
 			}
 		}
 
-		// Generates a new kitty using existing kitties
+		// Generates a new unique_item using existing unique_items
 		pub fn breed_dna(parent1: &[u8; 16], parent2: &[u8; 16]) -> ([u8; 16], Gender) {
-			// Call `gen_dna` to generate random kitty DNA
-			// We don't know what Gender this kitty is yet
+			// Call `gen_dna` to generate random unique_item DNA
+			// We don't know what Gender this unique_item is yet
 			let (mut new_dna, new_gender) = Self::gen_dna();
 
 			// randomly combine DNA using `mutate_dna_fragment`
@@ -329,67 +329,67 @@ pub mod pallet {
 			(new_dna, new_gender)
 		}
 
-		// Helper to mint a kitty
+		// Helper to mint a unique_item
 		pub fn mint(
 			owner: &T::AccountId,
 			dna: [u8; 16],
 			gender: Gender,
 		) -> Result<[u8; 16], DispatchError> {
 			// Create a new object
-			let kitty = Kitty::<T> { dna, price: None, gender, owner: owner.clone() };
+			let unique_item = UniqueItem::<T> { dna, price: None, gender, owner: owner.clone() };
 
-			// Check if the kitty does not already exist in our storage map
-			ensure!(!UniqueItems::<T>::contains_key(&kitty.dna), Error::<T>::DuplicateKitty);
+			// Check if the unique_item does not already exist in our storage map
+			ensure!(!UniqueItems::<T>::contains_key(&unique_item.dna), Error::<T>::DuplicateUniqueItem);
 
 			// Performs this operation first as it may fail
-			let count = CountForKitties::<T>::get();
+			let count = CountForUniqueItems::<T>::get();
 			let new_count = count.checked_add(1).ok_or(ArithmeticError::Overflow)?;
 
-			// Append kitty to KittiesOwned
-			KittiesOwned::<T>::try_append(&owner, kitty.dna)
+			// Append unique_item to UniqueItemsOwned
+			UniqueItemsOwned::<T>::try_append(&owner, unique_item.dna)
 				.map_err(|_| Error::<T>::TooManyOwned)?;
 
-			// Write new kitty to storage
-			UniqueItems::<T>::insert(kitty.dna, kitty);
-			CountForKitties::<T>::put(new_count);
+			// Write new unique_item to storage
+			UniqueItems::<T>::insert(unique_item.dna, unique_item);
+			CountForUniqueItems::<T>::put(new_count);
 
 			// Deposit our "Created" event.
-			Self::deposit_event(Event::Created { kitty: dna, owner: owner.clone() });
+			Self::deposit_event(Event::Created { unique_item: dna, owner: owner.clone() });
 
-			// Returns the DNA of the new kitty if this succeeds
+			// Returns the DNA of the new unique_item if this succeeds
 			Ok(dna)
 		}
 
-		// Update storage to transfer kitty
+		// Update storage to transfer unique_item
 		pub fn do_transfer(
-			kitty_id: [u8; 16],
+			unique_item_id: [u8; 16],
 			to: T::AccountId,
 			maybe_limit_price: Option<PriceOf<T>>,
 		) -> DispatchResult {
-			// Get the kitty
-			let mut kitty = UniqueItems::<T>::get(&kitty_id).ok_or(Error::<T>::NoKitty)?;
-			let from = kitty.owner;
+			// Get the unique_item
+			let mut unique_item = UniqueItems::<T>::get(&unique_item_id).ok_or(Error::<T>::NoUniqueItem)?;
+			let from = unique_item.owner;
 
 			ensure!(from != to, Error::<T>::TransferToSelf);
-			let mut from_owned = KittiesOwned::<T>::get(&from);
+			let mut from_owned = UniqueItemsOwned::<T>::get(&from);
 
-			// Remove kitty from list of owned kitties.
-			if let Some(ind) = from_owned.iter().position(|&id| id == kitty_id) {
+			// Remove unique_item from list of owned unique_items.
+			if let Some(ind) = from_owned.iter().position(|&id| id == unique_item_id) {
 				from_owned.swap_remove(ind);
 			} else {
-				return Err(Error::<T>::NoKitty.into())
+				return Err(Error::<T>::NoUniqueItem.into())
 			}
 
-			// Add kitty to the list of owned kitties.
-			let mut to_owned = KittiesOwned::<T>::get(&to);
-			to_owned.try_push(kitty_id).map_err(|()| Error::<T>::TooManyOwned)?;
+			// Add unique_item to the list of owned unique_items.
+			let mut to_owned = UniqueItemsOwned::<T>::get(&to);
+			to_owned.try_push(unique_item_id).map_err(|()| Error::<T>::TooManyOwned)?;
 
 			// Mutating state here via a balance transfer, so nothing is allowed to fail after this.
 			// The buyer will always be charged the actual price. The limit_price parameter is just
 			// a protection so the seller isn't able to front-run the transaction.
 			if let Some(limit_price) = maybe_limit_price {
-				// Current kitty price if for sale
-				if let Some((price, asset)) = kitty.price {
+				// Current unique_item price if for sale
+				if let Some((price, asset)) = unique_item.price {
 					ensure!(limit_price.0 >= price, Error::<T>::BidPriceTooLow);
 					// Transfer the amount from buyer to seller
 					T::Assets::transfer(asset, &to, &from, price)?;
@@ -397,25 +397,25 @@ pub mod pallet {
 					Self::deposit_event(Event::Sold {
 						seller: from.clone(),
 						buyer: to.clone(),
-						kitty: kitty_id,
+						unique_item: unique_item_id,
 						price: (price, asset),
 					});
 				} else {
-					// Kitty price is set to `None` and is not for sale
+					// UniqueItem price is set to `None` and is not for sale
 					return Err(Error::<T>::NotForSale.into())
 				}
 			}
 
-			// Transfer succeeded, update the kitty owner and reset the price to `None`.
-			kitty.owner = to.clone();
-			kitty.price = None;
+			// Transfer succeeded, update the unique_item owner and reset the price to `None`.
+			unique_item.owner = to.clone();
+			unique_item.price = None;
 
 			// Write updates to storage
-			UniqueItems::<T>::insert(&kitty_id, kitty);
-			KittiesOwned::<T>::insert(&to, to_owned);
-			KittiesOwned::<T>::insert(&from, from_owned);
+			UniqueItems::<T>::insert(&unique_item_id, unique_item);
+			UniqueItemsOwned::<T>::insert(&to, to_owned);
+			UniqueItemsOwned::<T>::insert(&from, from_owned);
 
-			Self::deposit_event(Event::Transferred { from, to, kitty: kitty_id });
+			Self::deposit_event(Event::Transferred { from, to, unique_item: unique_item_id });
 
 			Ok(())
 		}
