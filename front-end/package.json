@@ -61,7 +61,10 @@
       "react-app",
       "eslint:recommended",
       "prettier"
-    ]
+    ],
+    "rules": {
+      "no-unused-vars": "warn"
+    }
   },
   "engines": {
     "node": ">=16",
