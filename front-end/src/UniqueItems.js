@@ -27,7 +27,6 @@ export default function UniqueItems(props) {
         const entries = await api.query.nfts.uniqueItems.entries()
         let ids = []
         entries.forEach(([key, exposure]) => {
-          console.log('     exposure:', exposure.toHuman())
           let id = exposure.toHuman()['id']
           ids.push(id)
         })

@@ -12,6 +12,7 @@ import {
 import UniqueItemAvatar from './UniqueItemAvatar'
 import { useSubstrateState } from './substrate-lib'
 import { TxButton } from './substrate-lib/components'
+import { buildPrice, hexToAscii } from './lib/utils'
 
 // --- Transfer Modal ---
 
@@ -130,8 +131,13 @@ const SetPrice = props => {
           attrs={{
             palletRpc: 'nfts',
             callable: 'setPrice',
-            inputParams: [item.id, formValue.amount, formValue.currency],
-            paramFields: [true, true, true],
+            // inputParams: [item.id, [formValue.amount, formValue.currency]],
+            inputParams: [
+              item.id,
+              buildPrice(formValue.amount, formValue.currency),
+            ],
+            // inputParams: [item.id, [formValue.amount, ['token', [0, 'EURT']]]],
+            paramFields: [true, true],
           }}
         />
       </Modal.Actions>
@@ -169,7 +175,12 @@ const BuyUniqueItem = props => {
       <Modal.Content>
         <Form>
           <Form.Input fluid label="UniqueItem ID" readOnly value={item.id} />
-          <Form.Input fluid label="Price" readOnly value={item.price[0].toString()} />
+          <Form.Input
+            fluid
+            label="Price"
+            readOnly
+            value={priceToString(item.price)}
+          />
         </Form>
       </Modal.Content>
       <Modal.Actions>
@@ -195,13 +206,25 @@ const BuyUniqueItem = props => {
 
 // --- About UniqueItem Card ---
 
+function priceToString(price) {
+  if (price) {
+    if (price[1].token) {
+      if (price[1].token.short) {
+        return `${price[0]} ${hexToAscii(price[1].token.short)}`
+      } else {
+        return `${price[0]} ${hexToAscii(price[1].token.long)}`
+      }
+    } else {
+      return `${price[0]} Native`
+    }
+  }
+}
+
 const UniqueItemCard = props => {
   const { item, setStatus } = props
   const { id = null, owner = null, data = null, price = null } = item
   const { currentAccount } = useSubstrateState()
   const isSelf = currentAccount.address === item.owner
-
-  console.log("price", price)
 
   return (
     <Card>
@@ -219,7 +242,7 @@ const UniqueItemCard = props => {
           <p style={{ overflowWrap: 'break-word' }}>Data: {data.toHuman()}</p>
           <p style={{ overflowWrap: 'break-word' }}>Owner: {owner}</p>
           <p style={{ overflowWrap: 'break-word' }}>
-            Price: {price != null ? `${price[0]} ${price[1].token.short}` : 'Not For Sale'}
+            Price: {price != null ? priceToString(price) : 'Not For Sale'}
           </p>
         </Card.Description>
       </Card.Content>
