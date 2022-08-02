@@ -191,8 +191,7 @@ const BuyUniqueItem = props => {
 
 const UniqueItemCard = props => {
   const { item, setStatus } = props
-  const { id = null, owner = null, gender = null, price = null } = item
-  const displayDna = id && id.toJSON()
+  const { id = null, owner = null, data = null, price = null } = item
   const { currentAccount } = useSubstrateState()
   const isSelf = currentAccount.address === item.owner
 
@@ -206,10 +205,10 @@ const UniqueItemCard = props => {
       <UniqueItemAvatar id={id.toU8a()} />
       <Card.Content>
         <Card.Meta style={{ fontSize: '.9em', overflowWrap: 'break-word' }}>
-          DNA: {displayDna}
+          ID: {id.toHuman()}
         </Card.Meta>
         <Card.Description>
-          <p style={{ overflowWrap: 'break-word' }}>Gender: {gender}</p>
+          <p style={{ overflowWrap: 'break-word' }}>Data: {data.toHuman()}</p>
           <p style={{ overflowWrap: 'break-word' }}>Owner: {owner}</p>
           <p style={{ overflowWrap: 'break-word' }}>
             Price: {price || 'Not For Sale'}
