@@ -70,7 +70,11 @@ fn create_unique_item_should_work() {
 		// Increment extrinsic index to add entropy for DNA
 		frame_system::Pallet::<Test>::set_extrinsic_index(1);
 		let other_unique_item_id = *b"1234567890123450";
-		assert_ok!(Nfts::create_unique_item(Origin::signed(10), other_unique_item_id, data.clone()));
+		assert_ok!(Nfts::create_unique_item(
+			Origin::signed(10),
+			other_unique_item_id,
+			data.clone()
+		));
 	});
 }
 
@@ -131,7 +135,11 @@ fn transfer_unique_item_should_work() {
 
 #[test]
 fn transfer_unique_item_should_fail() {
-	new_test_ext(vec![(1, *b"1234567890123456", b"test".to_vec()), (2, *b"123456789012345a", b"othertest".to_vec())]).execute_with(|| {
+	new_test_ext(vec![
+		(1, *b"1234567890123456", b"test".to_vec()),
+		(2, *b"123456789012345a", b"othertest".to_vec()),
+	])
+	.execute_with(|| {
 		// Get the DNA of some unique_item
 		let id = UniqueItemsOwned::<Test>::get(1)[0];
 
@@ -247,7 +255,11 @@ fn buy_unique_item_fails() {
 
 #[test]
 fn set_price_works() {
-	new_test_ext(vec![(1, *b"1234567890123456", b"test".to_vec()), (2, *b"123456789012345a", b"test".to_vec())]).execute_with(|| {
+	new_test_ext(vec![
+		(1, *b"1234567890123456", b"test".to_vec()),
+		(2, *b"123456789012345a", b"test".to_vec()),
+	])
+	.execute_with(|| {
 		// Check set_price works as expected
 		let id = UniqueItemsOwned::<Test>::get(2)[0];
 		let set_price: PriceOf<Test> = (4, ASSET_1);
