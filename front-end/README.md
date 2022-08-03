@@ -10,6 +10,7 @@ npm install
 ```
 
 ### Troubleshooting
+
 If you encounter dependency issues, try `yarn` instead.
 
 ### Usage
@@ -28,27 +29,21 @@ npm build
 
 and open `build/index.html` in your favorite browser.
 
-## Miscellaneous
+### Navigating the page
 
-- Polkadot-js API and related crypto libraries depend
-  on [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) that is only
-  supported by modern browsers. To ensure that react-scripts properly transpile your webapp code, update
-  the `package.json` file:
+#### DEX
 
-  ```json
-  {
-    "browserslist": {
-      "production": [
-        ">0.2%",
-        "not ie <= 99",
-        "not android <= 4.4.4",
-        "not dead",
-        "not op_mini all"
-      ]
-    }
-  }
-  ```
+You can find the balances of the currently selected user at the top.
+This will show the `Native`, `EURT`, and `USDC` balances, as these are the only tokens that are configured in the node
+runtime.
+You should first create a pool for e.g. `EURT` and `USDC` and then add liquidity to it.
 
-  Refer
-  to [this doc page](https://github.com/vacp2p/docs.wakuconnect.dev/blob/develop/content/docs/guides/07_reactjs_relay.md)
-  .
+#### NFT
+
+You can create a new unique item by specifying an ID (simple u128) and some data (string of up to 255 bytes).
+Afterwards you can set a price for your unique item by clicking on "Set Price".
+Enter an amount and a currency (either 'native', 'EURT' or 'USDC') and click "Set Price".
+You could even use the liquidity token ('EURTUSDC' or 'USDCEURT' depending on how you created the pool) to set the
+price.
+You should then switch to another user using the select field at the top of the page.
+Now, the buttons will change and you can buy the unique item that you just set for sale on the other account.
