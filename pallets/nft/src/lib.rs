@@ -49,6 +49,7 @@ pub mod pallet {
 			+ MaxEncodedLen
 			+ Debug;
 
+		/// The type of assets used by the Assets handler.
 		type AssetId: FullCodec
 			+ MaxEncodedLen
 			+ Eq
@@ -64,14 +65,14 @@ pub mod pallet {
 		/// The type used to identify a unique item within a collection.
 		type ItemId: Member + Parameter + MaxEncodedLen + Copy + MaybeSerializeDeserialize;
 
-		/// The Currency handler for the unique_items pallet.
+		/// The MultiCurrency handler for this pallet.
 		type Assets: MultiCurrency<
 			Self::AccountId,
 			Balance = BalanceOf<Self>,
 			CurrencyId = Self::AssetId,
 		>;
 
-		/// The maximum length of data stored on-chain.
+		/// The maximum length of a unique_item's data stored on-chain.
 		#[pallet::constant]
 		type StringLimit: Get<u32>;
 

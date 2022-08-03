@@ -4,8 +4,6 @@ use codec::{EncodeLike, FullCodec};
 use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
 use num_integer::{sqrt, Roots};
 use orml_traits::{MultiCurrency, MultiReservableCurrency};
-pub use pallet::*;
-use primitives::TruncateFixedPointToInt;
 use scale_info::TypeInfo;
 use sp_arithmetic::{PerThing, Permill, UpperOf};
 use sp_runtime::{
@@ -20,6 +18,9 @@ use sp_std::{
 	fmt::Debug,
 	marker::PhantomData,
 };
+
+pub use pallet::*;
+use primitives::TruncateFixedPointToInt;
 use types::*;
 
 mod calc;
@@ -56,6 +57,7 @@ pub mod pallet {
 			+ TypeInfo
 			+ Debug;
 
+		/// The type of assets used by the Assets handler.
 		type AssetId: FullCodec
 			+ MaxEncodedLen
 			+ Eq
@@ -68,6 +70,7 @@ pub mod pallet {
 			+ TypeInfo
 			+ Ord;
 
+		/// The type of a pools ID
 		type PoolId: FullCodec
 			+ MaxEncodedLen
 			+ Default
@@ -81,9 +84,11 @@ pub mod pallet {
 			+ CheckedAdd
 			+ One;
 
+		/// The ID of this pallet. Used to derive pool account IDs.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
+		/// The MultiCurrency handler
 		type Assets: MultiCurrency<
 			Self::AccountId,
 			Balance = BalanceOf<Self>,
@@ -94,7 +99,7 @@ pub mod pallet {
 		type Convert: Convert<u128, BalanceOf<Self>> + Convert<BalanceOf<Self>, u128>;
 
 		/// This is used to derive the AssetId of the liquidity token.
-		/// The derivation is supposed to happen based on the two AssetIds of the assets in a pair
+		/// The derivation is supposed to happen based on the two AssetIds of the assets in a pair.
 		type LiquidityTokenConversion: StaticLookup<
 			Source = AssetIdOf<Self>,
 			Target = (AssetIdOf<Self>, AssetIdOf<Self>),
@@ -105,11 +110,13 @@ pub mod pallet {
 	#[pallet::generate_store(pub (super) trait Store)]
 	pub struct Pallet<T>(_);
 
+	/// Keeps track of the number of pools in existence.
 	#[pallet::storage]
 	#[pallet::getter(fn pool_count)]
 	#[allow(clippy::disallowed_types)]
 	pub type PoolCount<T: Config> = StorageValue<_, T::PoolId, ValueQuery>;
 
+	/// Map the pool id to the pool.
 	#[pallet::storage]
 	#[pallet::getter(fn pools)]
 	pub type Pools<T: Config> = StorageMap<_, Blake2_128Concat, T::PoolId, PoolOf<T>>;
@@ -119,11 +126,9 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub (super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		PoolCreated {
-			pool_id: T::PoolId,
-			owner: T::AccountId,
-			assets: CurrencyPair<AssetIdOf<T>>,
-		},
+		/// A new pol was created
+		PoolCreated { pool_id: T::PoolId, owner: T::AccountId, assets: CurrencyPair<AssetIdOf<T>> },
+		/// Liquidity was added to a pool
 		LiquidityAdded {
 			who: T::AccountId,
 			pool_id: T::PoolId,
@@ -131,6 +136,7 @@ pub mod pallet {
 			amount_b: BalanceOf<T>,
 			minted_lp: BalanceOf<T>,
 		},
+		/// Liquidity was removed from a pool
 		LiquidityRemoved {
 			who: T::AccountId,
 			pool_id: PoolIdOf<T>,
@@ -138,6 +144,7 @@ pub mod pallet {
 			amount_b: BalanceOf<T>,
 			total_issuance: BalanceOf<T>,
 		},
+		/// Two assets were swapped in a pool
 		Swapped {
 			who: T::AccountId,
 			pool_id: PoolIdOf<T>,
@@ -150,7 +157,6 @@ pub mod pallet {
 		},
 	}
 
-	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
 		PairMismatch,
@@ -169,7 +175,7 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Create pool
+		/// Create a new pool with the given params.
 		///
 		/// Emits `PoolCreated` event when successful.
 		#[pallet::weight(10_000)]
@@ -179,7 +185,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let _ = ensure_signed(origin)?;
 
-			let pool_id = Self::_create_pool(pool_params.clone())?;
+			let pool_id = Self::do_create_pool(pool_params.clone())?;
 
 			Self::deposit_event(Event::<T>::PoolCreated {
 				owner: pool_params.owner,
@@ -190,6 +196,9 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Add liquidity to a pool.
+		///
+		/// Emits `LiquidityAdded` event when successful.
 		#[pallet::weight(10_000)]
 		pub fn add_liquidity(
 			origin: OriginFor<T>,
@@ -204,6 +213,9 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Remove liquidity from a pool.
+		///
+		/// Emits `LiquidityRemoved` event when successful.
 		#[pallet::weight(10_000)]
 		pub fn remove_liquidity(
 			origin: OriginFor<T>,
@@ -217,8 +229,11 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Execute a swap
-		/// The user will send amount_b of token_b to receive the corresponding amount_a of token_a.
+		/// Execute a swap. The order of the tokens in the pair is important.
+		/// The user will send amount_b of pair.token_b to the pool to receive the corresponding
+		/// amount of pair.token_a.
+		///
+		/// Emits `Swapped` event when successful.
 		#[pallet::weight(10_000)]
 		pub fn swap(
 			origin: OriginFor<T>,
@@ -232,6 +247,10 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Buy a given amount of a given asset from the pool.
+		/// This is similar to `swap` but easier to use for users.
+		///
+		/// Emits `Swapped` event when successful.
 		#[pallet::weight(10_000)]
 		pub fn buy(
 			origin: OriginFor<T>,
@@ -245,6 +264,10 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Sell a given amount of a given asset to the pool.
+		/// This is similar to `swap` but easier to use for users.
+		///
+		/// Emits `Swapped` event when successful.
 		#[pallet::weight(10_000)]
 		pub fn sell(
 			origin: OriginFor<T>,
@@ -260,15 +283,20 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		/// Returns the pool for a given id.
 		pub(crate) fn get_pool(pool_id: PoolIdOf<T>) -> Result<PoolOf<T>, DispatchError> {
 			Pools::<T>::get(pool_id).ok_or_else(|| Error::<T>::PoolNotFound.into())
 		}
 
+		/// Derive a new pool id from the pallet ID.
 		pub(crate) fn account_id(pool_id: &PoolIdOf<T>) -> T::AccountId {
 			T::PalletId::get().into_sub_account_truncating(pool_id)
 		}
 
-		fn _create_pool(
+		/// Creates a new pool in storage with the given params.
+		/// The lp token is derived from the assets in the air. The derivation function is defined
+		/// in the pallet's config.
+		fn do_create_pool(
 			pool_params: PoolCreationParamsOf<T>,
 		) -> Result<PoolIdOf<T>, DispatchError> {
 			// Derive the lp token based on the pair
@@ -339,7 +367,6 @@ pub mod pallet {
 			amount: Self::Balance,
 		) -> Result<Self::Balance, DispatchError> {
 			let pool = Self::get_pool(pool_id)?;
-			let pool_account = Self::account_id(&pool_id);
 			let pair = pool.pair;
 			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
 
@@ -353,6 +380,8 @@ pub mod pallet {
 			quote.ok_or(Error::<T>::InvalidAmount.into())
 		}
 
+		/// Since the `swap` function always assumes the user is selling the asset in the pool,
+		/// the buy function calculates the `sell_amount` first and hands it to the `swap` function.
 		#[transactional]
 		fn buy(
 			who: &Self::AccountId,
@@ -374,6 +403,8 @@ pub mod pallet {
 			<Self as Amm>::swap(who, pool_id, pair, sell_amount)
 		}
 
+		/// Orders the `pair` of a pool such that the `amount` of the `asset_id` is sold in the
+		/// `swap`.
 		#[transactional]
 		fn sell(
 			who: &Self::AccountId,
@@ -386,6 +417,9 @@ pub mod pallet {
 			<Self as Amm>::swap(who, pool_id, pair, amount)
 		}
 
+		/// Adds liquidity to the given pool. Only one `amount` and `asset` are given because the
+		/// required amount of the other asset will be calculated automatically such that the ratio
+		/// of assets in the pool remains the same.
 		#[transactional]
 		fn add_liquidity(
 			who: &Self::AccountId,
@@ -462,6 +496,8 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Removes liquidity from the given pool. The `amount` refers to the liquidity tokens that
+		/// are used for this withdrawal.
 		#[transactional]
 		fn remove_liquidity(
 			who: &Self::AccountId,
