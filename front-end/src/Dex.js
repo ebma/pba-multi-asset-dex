@@ -16,6 +16,7 @@ function Pool(props) {
   const { id, account, tokenQuery } = props
   const { owner, pair, lpToken, fee } = props.pool
   const [balanceMap, setBalanceMap] = useState([])
+  const [status, setStatus] = useState('')
 
   const subscribePoolBalances = () => {
     let unsub = null
@@ -48,6 +49,9 @@ function Pool(props) {
   const balanceA = balanceMap.at(0) ? balanceMap[0].free : 0
   const balanceB = balanceMap.at(1) ? balanceMap[1].free : 0
 
+  const [swapCurrency, setSwapCurrency] = useState('')
+  const [swapAmount, setSwapAmount] = useState('')
+
   return (
     <Card fluid>
       <Card.Content>
@@ -64,6 +68,49 @@ function Pool(props) {
         </Card.Description>
         <Card.Description>Fee: {fee.toHuman()}</Card.Description>
         <Card.Description>Owner: {owner.toHuman()}</Card.Description>
+
+        <Form style={{ margin: '1em 0' }}>
+          <Form.Group widths="equal" style={{ textAlign: 'center' }}>
+            <Form.Input
+              fluid
+              label="Amount"
+              style={{ flexGrow: 1 }}
+              value={swapAmount}
+              onChange={e => setSwapAmount(e.target.value)}
+            />
+            <Form.Input
+              fluid
+              label="Token"
+              placeholder="USDC"
+              style={{ flexGrow: 1 }}
+              value={swapCurrency}
+              onChange={e => setSwapCurrency(e.target.value)}
+            />
+            <TxButton
+              label="Buy"
+              type="SIGNED-TX"
+              setStatus={setStatus}
+              attrs={{
+                palletRpc: 'dex',
+                callable: 'buy',
+                inputParams: [id, buildCurrency(swapCurrency), swapAmount],
+                paramFields: [true, true, true],
+              }}
+            />
+            <TxButton
+              label="Sell"
+              type="SIGNED-TX"
+              setStatus={setStatus}
+              attrs={{
+                palletRpc: 'dex',
+                callable: 'sell',
+                inputParams: [id, buildCurrency(swapCurrency), swapAmount],
+                paramFields: [true, true, true],
+              }}
+            />
+          </Form.Group>
+        </Form>
+        <div style={{ overflowWrap: 'break-word' }}>{status}</div>
       </Card.Content>
     </Card>
   )
