@@ -10,7 +10,7 @@ use frame_support::PalletId;
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
-		ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, Randomness, StorageInfo,
+		ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, StorageInfo,
 	},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
@@ -23,7 +23,6 @@ use frame_support::traits::{AsEnsureOriginWithArg, Contains};
 pub use frame_system::Call as SystemCall;
 use frame_system::EnsureSigned;
 use orml_traits::{parameter_type_with_key, MultiReservableCurrency};
-pub use pallet_balances::Call as BalancesCall;
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
@@ -175,7 +174,7 @@ impl frame_system::Config for Runtime {
 	/// What to do if an account is fully reaped from the system.
 	type OnKilledAccount = ();
 	/// The data to be stored in an account.
-	type AccountData = pallet_balances::AccountData<Balance>;
+	type AccountData = ();
 	/// Weight information for the extrinsics of this pallet.
 	type SystemWeightInfo = ();
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
@@ -184,8 +183,6 @@ impl frame_system::Config for Runtime {
 	type OnSetCode = ();
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
-
-impl pallet_randomness_collective_flip::Config for Runtime {}
 
 impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
@@ -219,20 +216,6 @@ impl pallet_timestamp::Config for Runtime {
 	type OnTimestampSet = Aura;
 	type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
 	type WeightInfo = ();
-}
-
-impl pallet_balances::Config for Runtime {
-	/// The type for recording an account's balance.
-	type Balance = Balance;
-	type DustRemoval = ();
-	/// The ubiquitous event type.
-	type Event = Event;
-	type ExistentialDeposit = ConstU128<500>;
-	type AccountStore = System;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-	type MaxLocks = ConstU32<50>;
-	type MaxReserves = ();
-	type ReserveIdentifier = [u8; 8];
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -282,26 +265,6 @@ impl orml_tokens::Config for Runtime {
 	type DustRemovalWhitelist = DustRemovalWhitelist;
 }
 
-impl orml_currencies::Config for Runtime {
-	type MultiCurrency = Tokens;
-	type NativeCurrency = BasicCurrencyAdapter<Runtime, Balances>;
-	type GetNativeCurrencyId = GetNativeCurrencyId;
-	type WeightInfo = ();
-}
-
-parameter_types! {
-	pub const CollectionDeposit: Balance = 10 * CENTS;
-	pub const ItemDeposit: Balance = DOLLARS;
-	pub const KeyLimit: u32 = 32;
-	pub const ValueLimit: u32 = 256;
-	pub const UniquesMetadataDepositBase: Balance = 10 * CENTS;
-	pub const AttributeDepositBase: Balance = 10 * CENTS;
-	pub const DepositPerByte: Balance = CENTS;
-	pub const UniquesStringLimit: u32 = 128;
-	pub const MaxPropertiesPerTheme: u32 = 100;
-	pub const MaxCollectionsEquippablePerPart: u32 = 100;
-}
-
 parameter_types! {
 	// One can own at most 9,999 UniqueItems
 	pub const MaxUniqueItemsOwned: u32 = 9999;
@@ -319,7 +282,6 @@ impl pallet_nft::Config for Runtime {
 	type Assets = Tokens;
 	type StringLimit = StringLimit;
 	type MaxUniqueItemsOwned = MaxUniqueItemsOwned;
-	type UniqueItemRandomness = RandomnessCollectiveFlip;
 }
 
 parameter_types! {
@@ -346,16 +308,13 @@ construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
 		System: frame_system,
-		RandomnessCollectiveFlip: pallet_randomness_collective_flip,
 		Timestamp: pallet_timestamp,
 		Aura: pallet_aura,
 		Grandpa: pallet_grandpa,
-		Balances: pallet_balances,
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 
 		Nfts: pallet_nft,
-		Currencies: orml_currencies,
 		Tokens: orml_tokens,
 		// Include the custom logic from the pallet-dex in the runtime.
 		Dex: pallet_dex,
@@ -397,7 +356,6 @@ mod benches {
 	define_benchmarks!(
 		[frame_benchmarking, BaselineBench::<Runtime>]
 		[frame_system, SystemBench::<Runtime>]
-		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_dex, Dex]
 	);

@@ -27,9 +27,7 @@ frame_support::construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		Balances: pallet_balances::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Tokens: orml_tokens::{Pallet, Storage, Config<T>, Event<T>},
-		Currencies: orml_currencies::{Pallet, Storage},
 
 		Dex: pallet_dex::{Pallet, Call, Storage, Event<T>},
 	}
@@ -53,7 +51,7 @@ impl system::Config for Test {
 	type DbWeight = ();
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<Balance>;
+	type AccountData = ();
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -87,20 +85,6 @@ impl pallet_dex::Config for Test {
 	type LiquidityTokenConversion = primitives::token_conversion::CurrencyConversion;
 }
 
-impl pallet_balances::Config for Test {
-	/// The type for recording an account's balance.
-	type Balance = Balance;
-	type DustRemoval = ();
-	/// The ubiquitous event type.
-	type Event = Event;
-	type ExistentialDeposit = ConstU128<500>;
-	type AccountStore = System;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Test>;
-	type MaxLocks = ConstU32<50>;
-	type MaxReserves = ();
-	type ReserveIdentifier = [u8; 8];
-}
-
 parameter_type_with_key! {
 	pub ExistentialDeposits: |_a: AssetId| -> Balance {
 		Zero::zero()
@@ -123,13 +107,6 @@ impl orml_tokens::Config for Test {
 	type DustRemovalWhitelist = Everything;
 }
 
-impl orml_currencies::Config for Test {
-	type MultiCurrency = Tokens;
-	type NativeCurrency = primitives::BasicCurrencyAdapter<Test, Balances>;
-	type GetNativeCurrencyId = GetNativeCurrencyId;
-	type WeightInfo = ();
-}
-
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
@@ -139,15 +116,6 @@ pub const ASSET_1: AssetId = CurrencyId::Token(TokenSymbol::Short([0; 4]));
 pub const ASSET_2: AssetId = CurrencyId::Token(TokenSymbol::Short([1; 4]));
 // pub const ASSET_1: AssetId = CurrencyId::Token(TokenSymbol::Short([0x00, 0x01, 0x02, 0x03]));
 
-pub const BALANCES: [(AccountId, Balance); 4] =
-	[(ALICE, 1000), (BOB, 1000), (CHARLIE, 1000), (DARWIN, 1000)];
-
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
-	let genesis = pallet_balances::GenesisConfig::<Test> { balances: Vec::from(BALANCES) };
-	genesis.assimilate_storage(&mut t).unwrap();
-	t.into()
-}
 
 pub fn new_test_ext_multi_currency() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();

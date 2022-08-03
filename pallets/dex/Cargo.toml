@@ -22,13 +22,11 @@ frame-benchmarking = { default-features = false, version = "4.0.0-dev", git = "h
 sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.26", default-features = false }
 sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.26", default-features = false }
 sp-arithmetic = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
-pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.26", default-features = false }
 
 num-integer = { version = "0.1.45", default-features = false }
 
 # Orml dependencies
 orml-tokens = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "polkadot-v0.9.26", default-features = false }
-orml-currencies = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "polkadot-v0.9.26", default-features = false }
 orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "polkadot-v0.9.26", default-features = false }
 
 primitives = { package = "dex-primitives", path = "../../primitives", default-features = false }
@@ -50,9 +48,8 @@ std = [
     "sp-std/std",
     "sp-runtime/std",
     "sp-arithmetic/std",
-    "pallet-balances/std",
+
     "orml-tokens/std",
-    "orml-currencies/std",
     "orml-traits/std",
     "primitives/std",
     "num-integer/std",

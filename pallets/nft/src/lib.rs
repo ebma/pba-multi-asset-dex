@@ -23,7 +23,7 @@ use types::*;
 pub mod pallet {
 	use frame_support::{
 		pallet_prelude::*,
-		traits::{tokens::ExistenceRequirement, Currency, Randomness},
+		traits::{tokens::ExistenceRequirement, Currency},
 	};
 	use frame_system::pallet_prelude::*;
 
@@ -79,9 +79,6 @@ pub mod pallet {
 		/// The maximum amount of unique_items a single account can own.
 		#[pallet::constant]
 		type MaxUniqueItemsOwned: Get<u32>;
-
-		/// The type of Randomness we want to specify for this pallet.
-		type UniqueItemRandomness: Randomness<Self::Hash, Self::BlockNumber>;
 	}
 
 	// Errors

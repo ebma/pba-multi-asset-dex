@@ -21,8 +21,6 @@ frame-system = { default-features = false, git = 'https://github.com/paritytech/
 frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
 frame-benchmarking = { default-features = false, optional = true, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
 sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
-pallet-randomness-collective-flip = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
-pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
 sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = "polkadot-v0.9.26" }
@@ -41,8 +39,6 @@ std = [
     'frame-benchmarking/std',
     'frame-support/std',
     'frame-system/std',
-    'pallet-balances/std',
-    'pallet-randomness-collective-flip/std',
     'serde/std',
     'sp-core/std',
     'sp-std/std',

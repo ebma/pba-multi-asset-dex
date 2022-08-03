@@ -29,9 +29,7 @@ frame_support::construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		Balances: pallet_balances::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Tokens: orml_tokens::{Pallet, Call, Storage, Config<T>, Event<T>},
-		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
 
 		Nfts: pallet_nft::{Pallet, Call, Storage, Config<T>, Event<T>},
 	}
@@ -60,7 +58,7 @@ impl frame_system::Config for Test {
 	type DbWeight = ();
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u64>;
+	type AccountData = ();
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -71,18 +69,6 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub const ExistentialDeposit: u64 = 1;
-}
-
-impl pallet_balances::Config for Test {
-	type AccountStore = System;
-	type Balance = u64;
-	type DustRemoval = ();
-	type Event = Event;
-	type ExistentialDeposit = ExistentialDeposit;
-	type MaxLocks = ();
-	type MaxReserves = ();
-	type ReserveIdentifier = [u8; 8];
-	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -103,7 +89,6 @@ impl pallet_unique_items::Config for Test {
 	type Assets = Tokens;
 	type StringLimit = StringLimit;
 	type MaxUniqueItemsOwned = MaxUniqueItemsOwned;
-	type UniqueItemRandomness = RandomnessCollectiveFlip;
 }
 
 parameter_types! {
@@ -131,8 +116,6 @@ impl orml_tokens::Config for Test {
 	type ReserveIdentifier = [u8; 8];
 	type DustRemovalWhitelist = Everything;
 }
-
-impl pallet_randomness_collective_flip::Config for Test {}
 
 pub const ASSET_1: AssetId = CurrencyId::Token(TokenSymbol::Short([0; 4]));
 pub const ASSET_2: AssetId = CurrencyId::Token(TokenSymbol::Short([1; 4]));
