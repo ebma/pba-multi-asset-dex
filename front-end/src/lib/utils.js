@@ -1,5 +1,4 @@
-
-export function hexToAscii (hex) {
+export function hexToAscii(hex) {
   if (!(typeof hex === 'number' || typeof hex == 'string')) {
     return ''
   }
@@ -19,27 +18,51 @@ export function hexToAscii (hex) {
 
 // build a price that is compatible with the runtime
 // if the given currency is invalid, just use 'native'
-export function buildPrice(amount, currency)  {
-  if (!currency) {
+export function buildPrice(amount, tokenSymbol) {
+  if (!tokenSymbol) {
     return [amount, 'native']
   }
 
+  let token = buildToken(tokenSymbol)
+  let price = [amount, token]
+  return price
+}
+
+export function buildToken(tokenSymbol) {
   let token
-  if (currency.length === 4) {
+  if (tokenSymbol.length === 4) {
     token = {
       token: {
-        short: currency,
+        short: tokenSymbol,
       },
     }
-  } else if (currency.length === 8) {
+  } else if (tokenSymbol.length === 8) {
     token = {
       token: {
-        long: currency,
+        long: tokenSymbol,
       },
     }
   } else {
     token = 'native'
   }
-  let price = [amount, token]
-  return price
+  return token
+}
+
+export function priceToString(price) {
+  if (price) {
+    return `${price[0]} ${tokenToString(price[1].token)}`
+  }
+}
+
+export function tokenToString(token) {
+  if (token) {
+    if (token.short) {
+      return hexToAscii(token.short)
+    } else {
+      console.log("in else block of", token.long)
+      return hexToAscii(token.long)
+    }
+  } else {
+    return 'Native'
+  }
 }

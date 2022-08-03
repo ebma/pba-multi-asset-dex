@@ -12,7 +12,7 @@ import {
 import UniqueItemAvatar from './UniqueItemAvatar'
 import { useSubstrateState } from './substrate-lib'
 import { TxButton } from './substrate-lib/components'
-import { buildPrice, hexToAscii } from './lib/utils'
+import { buildPrice, priceToString } from './lib/utils'
 
 // --- Transfer Modal ---
 
@@ -205,20 +205,6 @@ const BuyUniqueItem = props => {
 }
 
 // --- About UniqueItem Card ---
-
-function priceToString(price) {
-  if (price) {
-    if (price[1].token) {
-      if (price[1].token.short) {
-        return `${price[0]} ${hexToAscii(price[1].token.short)}`
-      } else {
-        return `${price[0]} ${hexToAscii(price[1].token.long)}`
-      }
-    } else {
-      return `${price[0]} Native`
-    }
-  }
-}
 
 const UniqueItemCard = props => {
   const { item, setStatus } = props
