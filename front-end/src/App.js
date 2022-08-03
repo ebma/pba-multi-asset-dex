@@ -13,14 +13,11 @@ import { SubstrateContextProvider, useSubstrateState } from './substrate-lib'
 import { DeveloperConsole } from './substrate-lib/components'
 
 import AccountSelector from './AccountSelector'
-import Balances from './Balances'
-import BlockNumber from './BlockNumber'
 import Dex from './Dex'
 import Events from './Events'
 import Interactor from './Interactor'
-import Metadata from './Metadata'
-import NodeInfo from './NodeInfo'
-import Kitties from './UniqueItems'
+import Items from './UniqueItems'
+import UserBalance from "./UserBalance"
 
 function Main() {
   const { apiState, apiError, keyringState } = useSubstrateState()
@@ -64,25 +61,19 @@ function Main() {
       <Container>
         <Grid stackable columns="equal">
           <Grid.Row>
+            <UserBalance />
+          </Grid.Row>
+          <Grid.Row>
             <Dex />
           </Grid.Row>
           <Grid.Row>
-            <Kitties />
+            <Items />
           </Grid.Row>
           <Grid.Row>
             <Events />
           </Grid.Row>
-          <Grid.Row stretched>
-            <Balances />
-          </Grid.Row>
           <Grid.Row>
             <Interactor />
-          </Grid.Row>
-          <Grid.Row stretched>
-            <NodeInfo />
-            <Metadata />
-            <BlockNumber />
-            <BlockNumber finalized />
           </Grid.Row>
         </Grid>
       </Container>
