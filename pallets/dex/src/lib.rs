@@ -114,7 +114,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn pool_count)]
 	#[allow(clippy::disallowed_types)]
-	pub type PoolCount<T: Config> = StorageValue<_,PoolIdOf<T>, ValueQuery>;
+	pub type PoolCount<T: Config> = StorageValue<_, PoolIdOf<T>, ValueQuery>;
 
 	/// Map the pool id to the pool.
 	#[pallet::storage]
@@ -380,12 +380,12 @@ pub mod pallet {
 			let pair = pool.pair;
 			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
 
+			ensure!(asset_id == pair.token_a || asset_id == pair.token_b, Error::<T>::InvalidAsset);
+
 			let quote = if pair.token_a == asset_id {
 				amount.checked_mul(&reserve_b).and_then(|x| x.checked_div(&reserve_a))
-			} else if pair.token_b == asset_id {
-				amount.checked_mul(&reserve_a).and_then(|x| x.checked_div(&reserve_b))
 			} else {
-				return Err(Error::<T>::InvalidAsset.into())
+				amount.checked_mul(&reserve_a).and_then(|x| x.checked_div(&reserve_b))
 			};
 			quote.ok_or(Error::<T>::InvalidAmount.into())
 		}
@@ -440,6 +440,11 @@ pub mod pallet {
 			let pool = Self::get_pool(pool_id)?;
 			let pool_account = Self::account_id(&pool_id);
 
+			ensure!(
+				asset == pool.pair.token_a || asset == pool.pair.token_b,
+				Error::<T>::InvalidAsset
+			);
+
 			let (reserve_a, reserve_b) = Self::pool_reserves(pool_id)?;
 			let (amount_a, amount_b) = if reserve_a.is_zero() && reserve_b.is_zero() {
 				(amount, amount)
@@ -447,23 +452,17 @@ pub mod pallet {
 				let other_amount =
 					<Self as Amm>::get_exchange_value(pool_id, pool.pair.token_b, amount)?;
 				(amount, other_amount)
-			} else if pool.pair.token_b == asset {
+			} else {
 				let other_amount =
 					<Self as Amm>::get_exchange_value(pool_id, pool.pair.token_a, amount)?;
 				(other_amount, amount)
-			} else {
-				return Err(Error::<T>::InvalidAsset.into())
 			};
 
 			let user_balance_a = T::Assets::free_balance(pool.pair.token_a, who);
-			if user_balance_a < amount_a {
-				return Err(Error::<T>::InsufficientBalance.into())
-			}
+			ensure!(user_balance_a >= amount_a, Error::<T>::InsufficientBalance);
 
 			let user_balance_b = T::Assets::free_balance(pool.pair.token_b, who);
-			if user_balance_b < amount_b {
-				return Err(Error::<T>::InsufficientBalance.into())
-			}
+			ensure!(user_balance_b >= amount_b, Error::<T>::InsufficientBalance);
 
 			// Convert to u128 for calculations
 			let (amount_a, amount_b) =

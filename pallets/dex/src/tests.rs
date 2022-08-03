@@ -5,13 +5,13 @@ use sp_arithmetic::FixedPointNumber;
 use sp_core::H256;
 use sp_runtime::{FixedU128, Permill};
 
-use primitives::TokenSymbol;
+use primitives::{CurrencyId, TokenSymbol};
 
 use crate::{
 	mock,
 	mock::*,
 	traits::{CurrencyPair, Pool, PoolCreationParams},
-	Error, PoolCreationParamsOf, PoolOf,
+	AssetIdOf, Error, PoolCreationParamsOf, PoolOf,
 };
 
 pub fn assert_has_event<T, F>(matcher: F)
@@ -67,7 +67,6 @@ fn create_pool_should_work() {
 		assert_eq!(pool.pair, pool_params.pair);
 		assert_eq!(pool.owner, pool_params.owner);
 		assert_eq!(pool.fee, pool_params.fee);
-		// assert_ok!(pool.lp_token);
 
 		assert_eq!(Dex::pool_count(), 1);
 
@@ -86,19 +85,33 @@ fn add_liquidity_should_work() {
 
 		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
 
-		let pool = Dex::pools(0).unwrap();
-		// assert_!(pool);
-
-		let balance_1_pre_deposit = Tokens::free_balance(ASSET_1, &ALICE);
-		let balance_2_pre_deposit = Tokens::free_balance(ASSET_2, &ALICE);
-
 		let pool_id = 0;
+		let pool = Dex::pools(pool_id).unwrap();
+
+		let user_balance_1_pre_deposit = Tokens::free_balance(ASSET_1, &ALICE);
+		let user_balance_2_pre_deposit = Tokens::free_balance(ASSET_2, &ALICE);
+
+		let pool_account = Dex::pool_accounts(pool_id).unwrap();
+		let pool_balance_1_pre_deposit = Tokens::free_balance(ASSET_1, &pool_account);
+		let pool_balance_2_pre_deposit = Tokens::free_balance(ASSET_2, &pool_account);
+
 		let amount = 100;
 		let asset = ASSET_1;
+		// Add liquidity to pool
 		assert_ok!(Dex::add_liquidity(Origin::signed(ALICE), pool_id, amount, asset));
 
-		assert_eq!(balance_1_pre_deposit - amount, Tokens::free_balance(ASSET_1, &ALICE));
-		assert_eq!(balance_2_pre_deposit - amount, Tokens::free_balance(ASSET_2, &ALICE));
+		// Expect user balance to be reduced by amount
+		assert_eq!(user_balance_1_pre_deposit - amount, Tokens::free_balance(ASSET_1, &ALICE));
+		assert_eq!(user_balance_2_pre_deposit - amount, Tokens::free_balance(ASSET_2, &ALICE));
+		// Expect pool balance to be increased by amount
+		assert_eq!(
+			pool_balance_1_pre_deposit + amount,
+			Tokens::free_balance(ASSET_1, &pool_account)
+		);
+		assert_eq!(
+			pool_balance_2_pre_deposit + amount,
+			Tokens::free_balance(ASSET_2, &pool_account)
+		);
 
 		// LP of initial deposit will be sqrt(amount_a*amount_b)
 		let expected_minted_lp = 100u128;
@@ -113,6 +126,60 @@ fn add_liquidity_should_work() {
 	});
 }
 
+#[test]
+fn add_liquidity_should_fail_with_invalid_asset() {
+	run_test(|| {
+		let pool_params = create_default_pool_params();
+
+		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool_params));
+		let pool_id = 0;
+		let amount = 100;
+		let invalid_asset: AssetIdOf<Test> = CurrencyId::Token(TokenSymbol::Short([u8::MAX; 4]));
+		assert_noop!(
+			Dex::add_liquidity(Origin::signed(ALICE), pool_id, amount, invalid_asset),
+			Error::<Test>::InvalidAsset
+		);
+	})
+}
+
+#[test]
+fn add_liquidity_should_fail_without_balance() {
+	run_test(|| {
+		let mut pool_params = create_default_pool_params();
+		// Use asset in pair that the user has no balance for
+		let asset_without_balance: AssetIdOf<Test> =
+			CurrencyId::Token(TokenSymbol::Short([u8::MAX; 4]));
+		pool_params.pair.token_a = asset_without_balance;
+
+		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool_params));
+		let pool_id = 0;
+		let amount = 100;
+		assert_noop!(
+			Dex::add_liquidity(Origin::signed(ALICE), pool_id, amount, asset_without_balance),
+			Error::<Test>::InsufficientBalance
+		);
+	})
+}
+
+#[test]
+fn remove_liquidity_with_too_high_amount_should_fail() {
+	run_test(|| {
+		let pool = create_default_pool_params();
+
+		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool));
+		let pool_id = 0;
+		let amount = 100;
+		let asset = ASSET_1;
+		assert_ok!(Dex::add_liquidity(Origin::signed(ALICE), pool_id, amount, asset));
+
+		let pool_id = 0;
+		let amount = 10_000;
+		assert_noop!(
+			Dex::remove_liquidity(Origin::signed(ALICE), pool_id, amount),
+			Error::<Test>::InsufficientLiquidityBalance
+		);
+	});
+}
 #[test]
 fn remove_liquidity_without_supply_should_fail() {
 	run_test(|| {
@@ -135,21 +202,36 @@ fn add_and_remove_liquidity_should_work() {
 		let pool_params = create_default_pool_params();
 
 		assert_ok!(Dex::create_pool(Origin::signed(ALICE), pool_params));
-
-		let pool: PoolOf<Test> = Dex::pools(0).unwrap();
-
-		let balance_1_pre_deposit = Tokens::free_balance(ASSET_1, &ALICE);
-		let balance_2_pre_deposit = Tokens::free_balance(ASSET_2, &ALICE);
-
+		// pool_id will be 0
 		let pool_id = 0;
+
+		let pool: PoolOf<Test> = Dex::pools(pool_id).unwrap();
+
+		let user_balance_1_pre_deposit = Tokens::free_balance(ASSET_1, &ALICE);
+		let user_balance_2_pre_deposit = Tokens::free_balance(ASSET_2, &ALICE);
+
+		let pool_account = Dex::pool_accounts(pool_id).unwrap();
+		let pool_balance_1_pre_deposit = Tokens::free_balance(ASSET_1, &pool_account);
+		let pool_balance_2_pre_deposit = Tokens::free_balance(ASSET_2, &pool_account);
+
 		let amount = 100;
 		let asset = ASSET_1;
 		assert_ok!(Dex::add_liquidity(Origin::signed(ALICE), pool_id, amount, asset));
 
-		assert_eq!(balance_1_pre_deposit - amount, Tokens::free_balance(ASSET_1, &ALICE));
-		assert_eq!(balance_2_pre_deposit - amount, Tokens::free_balance(ASSET_2, &ALICE));
+		// Expect user balance to be reduced by amount
+		assert_eq!(user_balance_1_pre_deposit - amount, Tokens::free_balance(ASSET_1, &ALICE));
+		assert_eq!(user_balance_2_pre_deposit - amount, Tokens::free_balance(ASSET_2, &ALICE));
+		// Expect pool balance to be increased by amount
+		assert_eq!(
+			pool_balance_1_pre_deposit + amount,
+			Tokens::free_balance(ASSET_1, &pool_account)
+		);
+		assert_eq!(
+			pool_balance_2_pre_deposit + amount,
+			Tokens::free_balance(ASSET_2, &pool_account)
+		);
 
-		// LP of initial deposit will be sqrt(amount_a*amount_b)
+		// LP of initial deposit will be sqrt(amount_a*amount_b) -> sqrt(100*100) = 100
 		let expected_minted_lp = 100u128;
 		// Expect Alice to now have 100 LP tokens
 		assert_eq!(Tokens::free_balance(pool.lp_token, &ALICE), expected_minted_lp);
@@ -161,8 +243,11 @@ fn add_and_remove_liquidity_should_work() {
 		});
 
 		// Withdraw all LP
-		let balance_1_pre_withdraw = Tokens::free_balance(ASSET_1, &ALICE);
-		let balance_2_pre_withdraw = Tokens::free_balance(ASSET_2, &ALICE);
+		let user_balance_1_pre_withdraw = Tokens::free_balance(ASSET_1, &ALICE);
+		let user_balance_2_pre_withdraw = Tokens::free_balance(ASSET_2, &ALICE);
+
+		let pool_balance_1_pre_withdraw = Tokens::free_balance(ASSET_1, &pool_account);
+		let pool_balance_2_pre_withdraw = Tokens::free_balance(ASSET_2, &pool_account);
 
 		let amount = expected_minted_lp;
 		assert_ok!(Dex::remove_liquidity(Origin::signed(ALICE), pool_id, amount));
@@ -171,12 +256,21 @@ fn add_and_remove_liquidity_should_work() {
 		let expected_amount_a = amount;
 		let expected_amount_b = amount;
 		assert_eq!(
-			balance_1_pre_withdraw + expected_amount_a,
+			user_balance_1_pre_withdraw + expected_amount_a,
 			Tokens::free_balance(ASSET_1, &ALICE)
 		);
 		assert_eq!(
-			balance_2_pre_withdraw + expected_amount_b,
+			user_balance_2_pre_withdraw + expected_amount_b,
 			Tokens::free_balance(ASSET_2, &ALICE)
+		);
+		// Expect pools balance to be reduced by amount
+		assert_eq!(
+			pool_balance_1_pre_withdraw - expected_amount_a,
+			Tokens::free_balance(ASSET_1, &pool_account)
+		);
+		assert_eq!(
+			pool_balance_2_pre_withdraw - expected_amount_b,
+			Tokens::free_balance(ASSET_2, &pool_account)
 		);
 
 		assert_last_event::<Test, _>(|e| {
@@ -217,6 +311,13 @@ fn sell_should_work() {
 			DEFAULT_EPSILON,
 		));
 
+		// Expect the pool to have more of ASSET_1 because the user swapped ASSET_1 for ASSET_2
+		let pool_account = Dex::pool_accounts(pool_id).unwrap();
+		assert!(
+			Tokens::free_balance(ASSET_1, &pool_account) >
+				Tokens::free_balance(ASSET_2, &pool_account)
+		);
+
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
             mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
@@ -255,6 +356,13 @@ fn buy_should_work() {
 			Tokens::free_balance(ASSET_2, &ALICE),
 			DEFAULT_EPSILON
 		));
+
+		// Expect the pool to have more of ASSET_2 because the user swapped ASSET_2 for ASSET_1
+		let pool_account = Dex::pool_accounts(pool_id).unwrap();
+		assert!(
+			Tokens::free_balance(ASSET_2, &pool_account) >
+				Tokens::free_balance(ASSET_1, &pool_account)
+		);
 
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
