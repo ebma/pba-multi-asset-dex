@@ -114,12 +114,17 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn pool_count)]
 	#[allow(clippy::disallowed_types)]
-	pub type PoolCount<T: Config> = StorageValue<_, T::PoolId, ValueQuery>;
+	pub type PoolCount<T: Config> = StorageValue<_,PoolIdOf<T>, ValueQuery>;
 
 	/// Map the pool id to the pool.
 	#[pallet::storage]
 	#[pallet::getter(fn pools)]
-	pub type Pools<T: Config> = StorageMap<_, Blake2_128Concat, T::PoolId, PoolOf<T>>;
+	pub type Pools<T: Config> = StorageMap<_, Blake2_128Concat, PoolIdOf<T>, PoolOf<T>>;
+
+	/// Map the pool id to the account that holds the pool's funds.
+	#[pallet::storage]
+	#[pallet::getter(fn pool_accounts)]
+	pub type PoolAccounts<T: Config> = StorageMap<_, Blake2_128Concat, PoolIdOf<T>, AccountIdOf<T>>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
@@ -314,7 +319,12 @@ pub mod pallet {
 			let pool_id =
 				PoolCount::<T>::try_mutate(|pool_count| -> Result<T::PoolId, DispatchError> {
 					let pool_id = *pool_count;
+					// Add the pool to the storage
 					Pools::<T>::insert(pool_id, pool.clone());
+					// Add the pools account to the storage
+					let pool_account = Self::account_id(&pool_id);
+					PoolAccounts::<T>::insert(pool_id, pool_account);
+
 					*pool_count = pool_id
 						.checked_add(&T::PoolId::one())
 						.ok_or(Error::<T>::MaximumPoolCountReached)?;
