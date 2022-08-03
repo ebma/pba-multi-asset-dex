@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Form, Grid } from 'semantic-ui-react'
+import { Card, Divider, Form, Grid } from 'semantic-ui-react'
 import { buildCurrency, currencyToString } from './lib/utils'
 
 import { useSubstrateState } from './substrate-lib'
@@ -49,6 +49,9 @@ function Pool(props) {
   const balanceA = balanceMap.at(0) ? balanceMap[0].free : 0
   const balanceB = balanceMap.at(1) ? balanceMap[1].free : 0
 
+  const [addLiquidityCurrency, setAddLiquidityCurrency] = useState('')
+  const [addLiquidityAmount, setAddLiquidityAmount] = useState('')
+  const [removeLiquidityAmount, setRemoveLiquidityAmount] = useState('')
   const [swapCurrency, setSwapCurrency] = useState('')
   const [swapAmount, setSwapAmount] = useState('')
 
@@ -69,6 +72,70 @@ function Pool(props) {
         <Card.Description>Fee: {fee.toHuman()}</Card.Description>
         <Card.Description>Owner: {owner.toHuman()}</Card.Description>
 
+        <Divider horizontal>Add Liquidity</Divider>
+        <Form style={{ margin: '1em 0' }}>
+          <Form.Group widths="equal" style={{ textAlign: 'center' }}>
+            <Form.Input
+              fluid
+              label="Amount"
+              style={{ flexGrow: 1 }}
+              value={addLiquidityAmount}
+              onChange={e => setAddLiquidityAmount(e.target.value)}
+            />
+            <Form.Input
+              fluid
+              label="Token"
+              placeholder="USDC"
+              style={{ flexGrow: 1 }}
+              value={addLiquidityCurrency}
+              onChange={e => setAddLiquidityCurrency(e.target.value)}
+            />
+            <TxButton
+              label="Add Liquidity"
+              type="SIGNED-TX"
+              setStatus={setStatus}
+              attrs={{
+                palletRpc: 'dex',
+                callable: 'addLiquidity',
+                inputParams: [
+                  id,
+                  addLiquidityAmount,
+                  buildCurrency(addLiquidityCurrency),
+                ],
+                paramFields: [true, true, true],
+              }}
+            />
+          </Form.Group>
+        </Form>
+
+        <Divider horizontal>Remove Liquidity</Divider>
+        <Form style={{ margin: '1em 0' }}>
+          <Form.Group widths="equal" style={{ textAlign: 'center' }}>
+            <Form.Input
+              fluid
+              label="Amount"
+              style={{ flexGrow: 1 }}
+              value={removeLiquidityAmount}
+              onChange={e => setRemoveLiquidityAmount(e.target.value)}
+            />
+            <TxButton
+              label="Remove Liquidity"
+              type="SIGNED-TX"
+              setStatus={setStatus}
+              attrs={{
+                palletRpc: 'dex',
+                callable: 'removeLiquidity',
+                inputParams: [
+                  id,
+                  removeLiquidityAmount,
+                ],
+                paramFields: [true, true],
+              }}
+            />
+          </Form.Group>
+        </Form>
+
+        <Divider horizontal>Swap</Divider>
         <Form style={{ margin: '1em 0' }}>
           <Form.Group widths="equal" style={{ textAlign: 'center' }}>
             <Form.Input

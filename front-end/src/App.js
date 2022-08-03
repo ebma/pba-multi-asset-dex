@@ -15,7 +15,6 @@ import { DeveloperConsole } from './substrate-lib/components'
 import AccountSelector from './AccountSelector'
 import Dex from './Dex'
 import Events from './Events'
-import Interactor from './Interactor'
 import Items from './UniqueItems'
 import UserBalance from "./UserBalance"
 
@@ -71,9 +70,6 @@ function Main() {
           </Grid.Row>
           <Grid.Row>
             <Events />
-          </Grid.Row>
-          <Grid.Row>
-            <Interactor />
           </Grid.Row>
         </Grid>
       </Container>
