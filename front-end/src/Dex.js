@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Card, Form, Grid } from 'semantic-ui-react'
-import { buildToken, hexToAscii, tokenToString } from './lib/utils'
+import { buildCurrency, currencyToString } from './lib/utils'
 
 import { useSubstrateState } from './substrate-lib'
 import { TxButton } from './substrate-lib/components'
@@ -13,19 +13,22 @@ const parseItem = ({ owner, pair, lpToken, fee }) => ({
 })
 
 function Pool(props) {
-  const { id } = props
+  const { id, account} = props
   const { owner, pair, lpToken, fee } = props.pool
+
+
   return (
-    <Card>
+    <Card fluid>
       <Card.Content>
         <Card.Header>Pool #{id}</Card.Header>
         <Card.Meta>
           <span>TODO</span>
         </Card.Meta>
-        <Card.Description>Owner {owner.toHuman()}</Card.Description>
-        <Card.Description>Fee {fee.toHuman()}</Card.Description>
-        <Card.Description>Pair: {tokenToString(pair.tokenA.token)} - {tokenToString(pair.tokenB.token)}</Card.Description>
-        <Card.Description>LP Token {tokenToString(lpToken.token)}</Card.Description>
+        <Card.Description>Pair: {currencyToString(pair.tokenA)} - {currencyToString(pair.tokenB)}</Card.Description>
+        <Card.Description>LP Token: {currencyToString(lpToken)}</Card.Description>
+        <Card.Description>Fee: {fee.toHuman()}</Card.Description>
+        <Card.Description>Owner: {owner.toHuman()}</Card.Description>
+        <Card.Description>Pool Account: {account}</Card.Description>
       </Card.Content>
     </Card>
   )
@@ -34,24 +37,35 @@ function Pool(props) {
 export default function Dex(props) {
   const { api, currentAccount, keyring } = useSubstrateState()
   const [poolIds, setPoolIds] = useState([])
+  const [poolAccounts, setPoolAccounts] = useState([])
   const [pools, setPools] = useState([])
   const [status, setStatus] = useState('')
 
-  console.log('uniqueItems', pools)
+  console.log("api", api.query.dex)
+  console.log("poolAccounts", poolAccounts)
 
   const subscribeCount = () => {
     let unsub = null
 
     const asyncFetch = async () => {
       unsub = await api.query.dex.poolCount(async count => {
-        const entries = await api.query.dex.pools.entries()
+        // fetch pool ids
+        let entries = await api.query.dex.pools.entries()
         let ids = []
         entries.forEach(([key, exposure]) => {
-          console.log("exposure", exposure.toHuman())
           let id = key.toHuman()
           ids.push(id)
         })
         setPoolIds(ids)
+
+        // fetch pool accounts
+        entries = await api.query.dex.poolAccounts.entries()
+        let accounts = []
+        entries.forEach(([key, exposure]) => {
+          let accountID = exposure.toHuman()
+          accounts.push(accountID)
+        })
+        setPoolAccounts(accounts)
       })
     }
 
@@ -89,8 +103,8 @@ export default function Dex(props) {
   const buildPoolCreationParams = () => {
     let owner = currentAccount?.address;
     let pair = {
-      token_a: buildToken(tokenA),
-      token_b: buildToken(tokenB),
+      token_a: buildCurrency(tokenA),
+      token_b: buildCurrency(tokenB),
     }
     return {
       owner,
@@ -104,7 +118,7 @@ export default function Dex(props) {
       <h1>Dex</h1>
       {poolIds.length === 0 && <span>No pools yet</span>}
       {pools.map((pool, index) => (
-        <Pool pool={pool} id={poolIds[index]} />
+        <Pool pool={pool} id={poolIds[index]} account={poolAccounts[index]}/>
       ))}
       <Form style={{ margin: '1em 0' }}>
         <Form.Group widths="equal" style={{ textAlign: 'center' }}>

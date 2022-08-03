@@ -23,44 +23,43 @@ export function buildPrice(amount, tokenSymbol) {
     return [amount, 'native']
   }
 
-  let token = buildToken(tokenSymbol)
+  let token = buildCurrency(tokenSymbol)
   let price = [amount, token]
   return price
 }
 
-export function buildToken(tokenSymbol) {
-  let token
+export function buildCurrency(tokenSymbol) {
+  let currency
   if (tokenSymbol.length === 4) {
-    token = {
+    currency = {
       token: {
         short: tokenSymbol,
       },
     }
   } else if (tokenSymbol.length === 8) {
-    token = {
+    currency = {
       token: {
         long: tokenSymbol,
       },
     }
   } else {
-    token = 'native'
+    currency = 'native'
   }
-  return token
+  return currency
 }
 
 export function priceToString(price) {
   if (price) {
-    return `${price[0]} ${tokenToString(price[1].token)}`
+    return `${price[0]} ${currencyToString(price[1])}`
   }
 }
 
-export function tokenToString(token) {
-  if (token) {
-    if (token.short) {
-      return hexToAscii(token.short)
+export function currencyToString(currency) {
+  if (currency?.token) {
+    if (currency.token.short) {
+      return hexToAscii(currency.token.short)
     } else {
-      console.log("in else block of", token.long)
-      return hexToAscii(token.long)
+      return hexToAscii(currency.token.long)
     }
   } else {
     return 'Native'
