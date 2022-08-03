@@ -13,22 +13,57 @@ const parseItem = ({ owner, pair, lpToken, fee }) => ({
 })
 
 function Pool(props) {
-  const { id, account} = props
+  const { id, account, tokenQuery } = props
   const { owner, pair, lpToken, fee } = props.pool
+  const [balanceMap, setBalanceMap] = useState([])
 
+  const subscribePoolBalances = () => {
+    let unsub = null
+
+    if (!account) return
+
+    const asyncFetch = async () => {
+      unsub = await tokenQuery.multi(
+        [
+          [account, pair.tokenA],
+          [account, pair.tokenB],
+        ],
+        items => {
+          console.log('items', items)
+          const itemsMap = items.map(item => item.toJSON())
+          setBalanceMap(itemsMap)
+        }
+      )
+    }
+
+    asyncFetch()
+
+    return () => {
+      unsub && unsub()
+    }
+  }
+
+  useEffect(subscribePoolBalances, [account, pair, tokenQuery])
+
+  const balanceA = balanceMap.at(0) ? balanceMap[0].free : 0
+  const balanceB = balanceMap.at(1) ? balanceMap[1].free : 0
 
   return (
     <Card fluid>
       <Card.Content>
         <Card.Header>Pool #{id}</Card.Header>
         <Card.Meta>
-          <span>TODO</span>
+          <Card.Description>Account: {account}</Card.Description>
         </Card.Meta>
-        <Card.Description>Pair: {currencyToString(pair.tokenA)} - {currencyToString(pair.tokenB)}</Card.Description>
-        <Card.Description>LP Token: {currencyToString(lpToken)}</Card.Description>
+        <Card.Description>
+          Pair: {balanceA} {currencyToString(pair.tokenA)} - {balanceB}{' '}
+          {currencyToString(pair.tokenB)}
+        </Card.Description>
+        <Card.Description>
+          LP Token: {currencyToString(lpToken)}
+        </Card.Description>
         <Card.Description>Fee: {fee.toHuman()}</Card.Description>
         <Card.Description>Owner: {owner.toHuman()}</Card.Description>
-        <Card.Description>Pool Account: {account}</Card.Description>
       </Card.Content>
     </Card>
   )
@@ -41,8 +76,12 @@ export default function Dex(props) {
   const [pools, setPools] = useState([])
   const [status, setStatus] = useState('')
 
-  console.log("api", api.query.dex)
-  console.log("poolAccounts", poolAccounts)
+  console.log('api', api.query)
+
+  const tokenQuery = React.useMemo(
+    () => api.query.tokens.accounts,
+    [api.query.tokens]
+  )
 
   const subscribeCount = () => {
     let unsub = null
@@ -101,7 +140,7 @@ export default function Dex(props) {
   const [fee, setFee] = useState('')
 
   const buildPoolCreationParams = () => {
-    let owner = currentAccount?.address;
+    let owner = currentAccount?.address
     let pair = {
       token_a: buildCurrency(tokenA),
       token_b: buildCurrency(tokenB),
@@ -118,7 +157,12 @@ export default function Dex(props) {
       <h1>Dex</h1>
       {poolIds.length === 0 && <span>No pools yet</span>}
       {pools.map((pool, index) => (
-        <Pool pool={pool} id={poolIds[index]} account={poolAccounts[index]}/>
+        <Pool
+          account={poolAccounts[index]}
+          id={poolIds[index]}
+          pool={pool}
+          tokenQuery={tokenQuery}
+        />
       ))}
       <Form style={{ margin: '1em 0' }}>
         <Form.Group widths="equal" style={{ textAlign: 'center' }}>
