@@ -39,7 +39,6 @@ export default function Main(props) {
 
     return () => unsubscribeAll && unsubscribeAll()
   }, [api, currentAccount, setBalances])
-  console.log('currentaccount', currentAccount)
 
   return (
     <Grid.Column>

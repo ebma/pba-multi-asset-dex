@@ -400,6 +400,11 @@ pub mod pallet {
 			amount: Self::Balance,
 		) -> Result<Self::Balance, DispatchError> {
 			let pool = Self::get_pool(pool_id)?;
+			ensure!(
+				asset_id == pool.pair.token_a || asset_id == pool.pair.token_b,
+				Error::<T>::InvalidAsset
+			);
+
 			let pair = if asset_id == pool.pair.token_a { pool.pair } else { pool.pair.swap() };
 
 			// Compute how much user has to pay to buy the given amount of the given asset.
@@ -423,6 +428,11 @@ pub mod pallet {
 			amount: Self::Balance,
 		) -> Result<Self::Balance, DispatchError> {
 			let pool = Self::get_pool(pool_id)?;
+			ensure!(
+				asset_id == pool.pair.token_a || asset_id == pool.pair.token_b,
+				Error::<T>::InvalidAsset
+			);
+
 			let pair = if asset_id == pool.pair.token_a { pool.pair.swap() } else { pool.pair };
 			<Self as Amm>::swap(who, pool_id, pair, amount)
 		}

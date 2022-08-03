@@ -30,7 +30,6 @@ function Pool(props) {
           [account, pair.tokenB],
         ],
         items => {
-          console.log('items', items)
           const itemsMap = items.map(item => item.toJSON())
           setBalanceMap(itemsMap)
         }
@@ -189,8 +188,6 @@ export default function Dex(props) {
   const [poolAccounts, setPoolAccounts] = useState([])
   const [pools, setPools] = useState([])
   const [status, setStatus] = useState('')
-
-  console.log('api', api.query)
 
   const tokenQuery = React.useMemo(
     () => api.query.tokens.accounts,

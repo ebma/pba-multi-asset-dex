@@ -1,6 +1,6 @@
 use node_template_runtime::{
-	AccountId, AuraConfig, BalancesConfig, CurrencyId, GenesisConfig, GrandpaConfig, NftsConfig, Signature,
-	SudoConfig, SystemConfig, TokenSymbol, TokensConfig, WASM_BINARY,
+	AccountId, AuraConfig, BalancesConfig, CurrencyId, GenesisConfig, GrandpaConfig, NftsConfig,
+	Signature, SudoConfig, SystemConfig, TokenSymbol, TokensConfig, WASM_BINARY,
 };
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -164,8 +164,6 @@ fn testnet_genesis(
 				})
 				.collect(),
 		},
-		nfts: NftsConfig {
-			kitties: vec![]
-		}
+		nfts: NftsConfig { unique_items: vec![] },
 	}
 }
