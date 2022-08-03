@@ -1,8 +1,8 @@
-use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
+use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::RuntimeDebug;
 use scale_info::TypeInfo;
 use sp_runtime::{DispatchError, Permill};
-use sp_std::cmp::Ordering;
+
 
 #[derive(RuntimeDebug, Encode, Decode, MaxEncodedLen, Copy, Clone, Eq, TypeInfo)]
 pub struct CurrencyPair<AssetId> {

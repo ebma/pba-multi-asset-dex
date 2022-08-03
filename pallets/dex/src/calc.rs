@@ -2,8 +2,7 @@ use crate::{Config, Error};
 use frame_support::ensure;
 use sp_arithmetic::Permill;
 use sp_runtime::{
-	traits::{IntegerSquareRoot, One, Zero},
-	ArithmeticError, PerThing,
+	PerThing,
 };
 
 pub(crate) fn get_amount_in<T: Config>(

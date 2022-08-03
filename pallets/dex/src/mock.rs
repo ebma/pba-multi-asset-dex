@@ -7,11 +7,11 @@ use frame_system as system;
 use orml_traits::parameter_type_with_key;
 use primitives::{CurrencyId, TokenSymbol};
 pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
-use sp_arithmetic::{FixedI128, FixedU128, Permill};
+
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, ConstU128, ConvertInto, IdentityLookup, Zero},
+	traits::{BlakeTwo256, ConvertInto, IdentityLookup, Zero},
 };
 
 use crate as pallet_dex;

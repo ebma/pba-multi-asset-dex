@@ -1,10 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{EncodeLike, FullCodec};
+use codec::{FullCodec};
 use orml_traits::MultiCurrency;
 pub use pallet::*;
-use scale_info::TypeInfo;
-use sp_io::hashing::blake2_128;
+
+
 use sp_runtime::{traits::AtLeast32BitUnsigned, ArithmeticError, FixedPointOperand};
 use sp_std::{convert::TryInto, fmt::Debug};
 
@@ -23,7 +23,7 @@ use types::*;
 pub mod pallet {
 	use frame_support::{
 		pallet_prelude::*,
-		traits::{tokens::ExistenceRequirement, Currency},
+		traits::{Currency},
 	};
 	use frame_system::pallet_prelude::*;
 

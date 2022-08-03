@@ -1,8 +1,8 @@
 use crate::{AccountIdOf, Config, DataOf, ItemIdOf, PriceOf};
-use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
+use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::RuntimeDebug;
 use scale_info::TypeInfo;
-use sp_runtime::{traits::Get, BoundedVec};
+
 
 // Struct for holding unique_item information
 #[derive(Clone, Encode, Decode, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]

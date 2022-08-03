@@ -19,15 +19,15 @@ pub use frame_support::{
 	StorageValue,
 };
 // A few exports that help ease life for downstream crates.
-use frame_support::traits::{AsEnsureOriginWithArg, Contains};
+use frame_support::traits::{Contains};
 pub use frame_system::Call as SystemCall;
-use frame_system::EnsureSigned;
-use orml_traits::{parameter_type_with_key, MultiReservableCurrency};
+
+use orml_traits::{parameter_type_with_key};
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
 pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::CurrencyAdapter;
+
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
@@ -36,11 +36,10 @@ pub use sp_runtime::BuildStorage;
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto, IdentifyAccount, NumberFor,
-		Verify, Zero,
+		AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto, NumberFor, Zero,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
+	ApplyExtrinsicResult,
 };
 pub use sp_runtime::{Perbill, Permill};
 use sp_std::prelude::*;
@@ -49,14 +48,14 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 pub mod constants;
-use constants::{currency::*, time::*};
+use constants::{time::*};
 pub use pallet_dex;
 pub use primitives::{
 	self, AccountId, Amount, Balance, BlockNumber, CurrencyId, CurrencyId::Token, CurrencyInfo,
 	Hash, Index, Moment, Nonce, Signature, SignedFixedPoint, SignedInner, TokenSymbol,
 	UnsignedFixedPoint, UnsignedInner,
 };
-use primitives::{BasicCurrencyAdapter, PoolId};
+use primitives::{PoolId};
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]

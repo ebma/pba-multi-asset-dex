@@ -1,16 +1,16 @@
 use frame_support::{assert_noop, assert_ok};
 use frame_system::{Config, EventRecord};
 use orml_traits::MultiCurrency;
-use sp_arithmetic::FixedPointNumber;
+
 use sp_core::H256;
-use sp_runtime::{FixedU128, Permill};
+use sp_runtime::{Permill};
 
 use primitives::{CurrencyId, TokenSymbol};
 
 use crate::{
 	mock,
 	mock::*,
-	traits::{CurrencyPair, Pool, PoolCreationParams},
+	traits::{CurrencyPair, PoolCreationParams},
 	AssetIdOf, Error, PoolCreationParamsOf, PoolOf,
 };
 
@@ -320,7 +320,7 @@ fn sell_should_work() {
 
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
-            mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
+            mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a: _, amount_b, token_a, token_b, fee})
             if who == ALICE && pool_id == pool_id && amount_b == amount_to_sell &&
 			token_a == ASSET_2 && token_b == ASSET_1 && fee == pool_params.fee)
 		});
@@ -366,7 +366,7 @@ fn buy_should_work() {
 
 		assert_last_event::<Test, _>(|e| {
 			matches!(e.event,
-            mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b, token_a, token_b, fee})
+            mock::Event::Dex(crate::Event::Swapped {who, pool_id, amount_a, amount_b: _, token_a, token_b, fee})
             if who == ALICE && pool_id == pool_id && amount_a == amount_to_receive &&
 			token_a == ASSET_1 && token_b == ASSET_2 && fee == pool_params.fee)
 		});

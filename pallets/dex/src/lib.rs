@@ -1,26 +1,25 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{EncodeLike, FullCodec};
-use frame_support::{dispatch::DispatchResult, traits::Get, transactional};
-use num_integer::{sqrt, Roots};
-use orml_traits::{MultiCurrency, MultiReservableCurrency};
-use scale_info::TypeInfo;
-use sp_arithmetic::{PerThing, Permill, UpperOf};
+use codec::{FullCodec};
+use frame_support::{transactional};
+use num_integer::{sqrt};
+use orml_traits::{MultiCurrency};
+
+use sp_arithmetic::{PerThing, Permill};
 use sp_runtime::{
 	traits::{
-		AccountIdConversion, AtLeast32BitUnsigned, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub,
-		Convert, MaybeSerializeDeserialize, One, Saturating, StaticLookup, Zero,
+		AccountIdConversion, AtLeast32BitUnsigned, CheckedAdd, CheckedDiv, CheckedMul,
+		Convert, One, Saturating, StaticLookup, Zero,
 	},
-	ArithmeticError, FixedPointNumber, FixedPointOperand,
+	ArithmeticError, FixedPointOperand,
 };
 use sp_std::{
-	convert::{TryFrom, TryInto},
+	convert::{TryInto},
 	fmt::Debug,
-	marker::PhantomData,
 };
 
 pub use pallet::*;
-use primitives::TruncateFixedPointToInt;
+
 use types::*;
 
 mod calc;
@@ -38,7 +37,7 @@ pub mod pallet {
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
 
-	use crate::traits::{Amm, CurrencyPair, Pool, PoolCreationParams};
+	use crate::traits::{Amm, CurrencyPair, Pool};
 
 	use super::*;
 

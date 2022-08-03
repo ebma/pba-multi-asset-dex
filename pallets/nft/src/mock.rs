@@ -4,17 +4,16 @@ use crate as pallet_unique_items;
 use crate as pallet_nft;
 use frame_support::{
 	parameter_types,
-	traits::{ConstU16, ConstU32, ConstU64, Everything, GenesisBuild},
-	PalletId,
+	traits::{ConstU32, Everything, GenesisBuild},
 };
-use frame_system as system;
+
 use orml_traits::parameter_type_with_key;
 use primitives::{CurrencyId, TokenSymbol};
 pub use primitives::{CurrencyId::Token, TokenSymbol::*, UnsignedInner};
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, ConstU128, ConvertInto, IdentityLookup, Zero},
+	traits::{BlakeTwo256, IdentityLookup, Zero},
 	BoundedVec, BuildStorage,
 };
 

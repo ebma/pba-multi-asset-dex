@@ -1,6 +1,6 @@
 use crate::{CurrencyId, LongSymbol, ShortSymbol, TokenSymbol};
-use sp_runtime::traits::{Convert, LookupError, StaticLookup};
-use sp_std::{convert::TryInto, str::from_utf8, vec::Vec};
+use sp_runtime::traits::{LookupError, StaticLookup};
+
 
 pub struct CurrencyConversion;
 
