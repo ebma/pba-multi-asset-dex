@@ -109,11 +109,12 @@ const SetPrice = props => {
             fluid
             label="Price"
             placeholder="Enter Price"
+            type="number"
             onChange={formChange('amount')}
           />
           <Form.Input
             fluid
-            label="Currency (4 or 8 letters currency e.g. 'EURT' or 'EURTUSDC')"
+            label="Currency (either 'native' or a 4 or 8 letters currency e.g. 'EURT' or 'EURTUSDC')"
             placeholder="Enter Currency"
             onChange={formChange('currency')}
           />

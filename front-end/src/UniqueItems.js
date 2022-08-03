@@ -74,6 +74,7 @@ export default function UniqueItems(props) {
             fluid
             label="ID"
             value={newItemID}
+            type="number"
             onChange={e => setNewItemID(e.target.value)}
             style={{ flexGrow: 1 }}
           />
